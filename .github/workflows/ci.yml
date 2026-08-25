@@ -10,7 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        # Not 18 or 20: vitest 4's rolldown dependency imports node:util's
+        # styleText, which isn't available on either (empirically - not just
+        # 18, which never has it, but also the latest 20.x LTS as of this
+        # writing, despite vitest's own package.json engines field claiming
+        # ^20.0.0 support). This is a test-tooling constraint only - the
+        # published package (dist/, no vitest dependency) still targets
+        # Node >=18, see package.json's own engines field.
+        node-version: [22, 24]
     steps:
       - uses: actions/checkout@v4
 
