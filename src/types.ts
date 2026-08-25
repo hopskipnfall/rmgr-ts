@@ -63,7 +63,12 @@ export interface GameStart {
   /** `"off"` for a file recorded before this field existed - see `PortSettings.team`'s doc comment. */
   readonly handicapMode: HandicapMode;
   /** Index = port number, 0-3. */
-  readonly ports: readonly [PortSettings, PortSettings, PortSettings, PortSettings];
+  readonly ports: readonly [
+    PortSettings,
+    PortSettings,
+    PortSettings,
+    PortSettings,
+  ];
   /**
    * Sourced from netplay room metadata, never from in-game name tags.
    * An empty string for an offline match or an unnamed port.

@@ -1,6 +1,15 @@
-import type { Frame, GameEnd, GameStart, PortIndex, PortSettings, SerializableReplay } from "../src/types.js";
+import type {
+  Frame,
+  GameEnd,
+  GameStart,
+  PortIndex,
+  PortSettings,
+  SerializableReplay,
+} from "../src/types.js";
 
-export function makePortSettings(overrides: Partial<PortSettings> = {}): PortSettings {
+export function makePortSettings(
+  overrides: Partial<PortSettings> = {},
+): PortSettings {
   return {
     slotType: "human",
     characterId: 0,
@@ -34,7 +43,10 @@ export function makeGameStart(overrides: Partial<GameStart> = {}): GameStart {
   };
 }
 
-export function makeFrame(frameNumber: number, ports: readonly PortIndex[] = [0, 1]): Frame {
+export function makeFrame(
+  frameNumber: number,
+  ports: readonly PortIndex[] = [0, 1],
+): Frame {
   const entry: { -readonly [K in PortIndex]?: Frame["ports"][K] } = {};
   for (const port of ports) {
     entry[port] = {
@@ -72,7 +84,9 @@ export function makeGameEnd(overrides: Partial<GameEnd> = {}): GameEnd {
   };
 }
 
-export function makeReplay(overrides: Partial<SerializableReplay> = {}): SerializableReplay {
+export function makeReplay(
+  overrides: Partial<SerializableReplay> = {},
+): SerializableReplay {
   return {
     goodName: "SmashRemix2.0.1",
     recorderSchemaVersion: 1,

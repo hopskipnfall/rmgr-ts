@@ -10,7 +10,14 @@ import {
   handicapModeToWire,
   slotTypeToWire,
 } from "./constants.js";
-import type { GameEnd, GameStart, PortIndex, PostFrameUpdate, PreFrameUpdate, SerializableReplay } from "./types.js";
+import type {
+  GameEnd,
+  GameStart,
+  PortIndex,
+  PostFrameUpdate,
+  PreFrameUpdate,
+  SerializableReplay,
+} from "./types.js";
 
 const PORT_ORDER: readonly PortIndex[] = [0, 1, 2, 3];
 

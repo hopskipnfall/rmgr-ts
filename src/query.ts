@@ -6,7 +6,10 @@ import type { FramePortData, PortIndex, Replay } from "./types.js";
  * thousands of frames), but avoid calling this in a tight per-frame loop
  * over the whole replay; iterate `replay.frames` directly instead.
  */
-export function getFrame(replay: Replay, frameNumber: number): Replay["frames"][number] | undefined {
+export function getFrame(
+  replay: Replay,
+  frameNumber: number,
+): Replay["frames"][number] | undefined {
   return replay.frames.find((f) => f.frame === frameNumber);
 }
 
@@ -21,7 +24,10 @@ export interface PortFrame extends FramePortData {
  * in yet). Returned frames are already in ascending frame-number order,
  * since `replay.frames` is.
  */
-export function getPortTimeline(replay: Replay, port: PortIndex): readonly PortFrame[] {
+export function getPortTimeline(
+  replay: Replay,
+  port: PortIndex,
+): readonly PortFrame[] {
   const timeline: PortFrame[] = [];
   for (const frame of replay.frames) {
     const data = frame.ports[port];

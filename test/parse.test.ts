@@ -11,10 +11,13 @@ import {
 } from "../src/constants.js";
 import { ReplayParseError, parseReplay } from "../src/parse.js";
 import { serializeReplay } from "../src/serialize.js";
-import { makeFrame, makeGameEnd, makeGameStart, makeReplay } from "./fixtures.js";
+import { makeFrame, makeGameStart, makeReplay } from "./fixtures.js";
 
 /** Builds a raw file with an explicit header streamLength, bypassing serializeReplay's "always write the true length" behavior. */
-function buildRawFile(streamLength: number, eventBytes: Uint8Array): Uint8Array {
+function buildRawFile(
+  streamLength: number,
+  eventBytes: Uint8Array,
+): Uint8Array {
   const header = new BinaryWriter();
   header.writeBytes(new TextEncoder().encode(MAGIC));
   header.writeU8(FORMAT_VERSION);
@@ -75,7 +78,9 @@ describe("parseReplay error handling", () => {
 
     // Re-use the real GameStart bytes from `base`: header(HEADER_SIZE) + EventPayloads event: code(1) + count(1) + 4 entries * 3 bytes each (12) = 14
     const gameStartEventStart = HEADER_SIZE + 14;
-    w.writeBytes(base.subarray(gameStartEventStart, gameStartEventStart + 1 + 164));
+    w.writeBytes(
+      base.subarray(gameStartEventStart, gameStartEventStart + 1 + 164),
+    );
 
     const bytes = buildRawFile(w.length, w.toUint8Array());
     const parsed = parseReplay(bytes);
@@ -87,7 +92,9 @@ describe("parseReplay error handling", () => {
   it("treats a header streamLength of 0 as a truncated/incomplete recording and reads to EOF", () => {
     const eventStream = new BinaryWriter();
     // Build a minimal valid event stream by hand: EventPayloads + GameStart, no GameEnd.
-    const full = serializeReplay(makeReplay({ frames: [makeFrame(0), makeFrame(1)], gameEnd: null }));
+    const full = serializeReplay(
+      makeReplay({ frames: [makeFrame(0), makeFrame(1)], gameEnd: null }),
+    );
     const eventBytes = full.subarray(HEADER_SIZE); // strip the real header off
     const bytes = buildRawFile(0, eventBytes); // but claim streamLength: 0, as a live-recording crash would
 
@@ -115,7 +122,9 @@ describe("parseReplay error handling", () => {
     const base = serializeReplay(makeReplay({ frames: [], gameEnd: null }));
     // header(HEADER_SIZE) + EventPayloads event: code(1) + count(1) + 4 entries * 3 bytes each (12) = 14
     const gameStartEventStart = HEADER_SIZE + 14;
-    w.writeBytes(base.subarray(gameStartEventStart, gameStartEventStart + 1 + 164));
+    w.writeBytes(
+      base.subarray(gameStartEventStart, gameStartEventStart + 1 + 164),
+    );
 
     // A PostFrameUpdate with no preceding PreFrameUpdate for frame 0, port 0.
     w.writeU8(EventCode.PostFrameUpdate);
@@ -155,9 +164,14 @@ describe("parseReplay error handling", () => {
     // package writes ARE the old v1 layout unchanged (fields were only ever
     // appended after it) - slicing them off a real serialized payload is
     // exactly what an old-format file's GameStart event looks like.
-    const full = serializeReplay(makeReplay({ gameStart: makeGameStart(), frames: [], gameEnd: null }));
+    const full = serializeReplay(
+      makeReplay({ gameStart: makeGameStart(), frames: [], gameEnd: null }),
+    );
     const gameStartEventStart = HEADER_SIZE + 14; // header(HEADER_SIZE) + EventPayloads event (14)
-    const oldGameStartPayload = full.subarray(gameStartEventStart + 1, gameStartEventStart + 1 + GAME_START_BASE_SIZE);
+    const oldGameStartPayload = full.subarray(
+      gameStartEventStart + 1,
+      gameStartEventStart + 1 + GAME_START_BASE_SIZE,
+    );
     expect(oldGameStartPayload).toHaveLength(GAME_START_BASE_SIZE);
 
     const w = new BinaryWriter();
@@ -187,7 +201,9 @@ describe("parseReplay error handling", () => {
     // package writes ARE the old v1 layout unchanged, so slicing them off a
     // real serialized payload is exactly what an old-format file's
     // PostFrameUpdate event looks like.
-    const full = serializeReplay(makeReplay({ frames: [makeFrame(0, [0])], gameEnd: null }));
+    const full = serializeReplay(
+      makeReplay({ frames: [makeFrame(0, [0])], gameEnd: null }),
+    );
     const gameStartEventStart = HEADER_SIZE + 14; // header(HEADER_SIZE) + EventPayloads event (14)
     const preFrameEventStart = gameStartEventStart + (1 + 164);
     const postFrameEventStart = preFrameEventStart + (1 + 9);
@@ -206,8 +222,12 @@ describe("parseReplay error handling", () => {
     w.writeU16(9);
     w.writeU8(EventCode.PostFrameUpdate);
     w.writeU16(POST_FRAME_BASE_SIZE);
-    w.writeBytes(full.subarray(gameStartEventStart, gameStartEventStart + (1 + 164))); // real GameStart, unmodified
-    w.writeBytes(full.subarray(preFrameEventStart, preFrameEventStart + (1 + 9))); // real PreFrameUpdate, unmodified
+    w.writeBytes(
+      full.subarray(gameStartEventStart, gameStartEventStart + (1 + 164)),
+    ); // real GameStart, unmodified
+    w.writeBytes(
+      full.subarray(preFrameEventStart, preFrameEventStart + (1 + 9)),
+    ); // real PreFrameUpdate, unmodified
     w.writeU8(EventCode.PostFrameUpdate);
     w.writeBytes(oldPostFramePayload);
 

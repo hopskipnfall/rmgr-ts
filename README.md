@@ -2,7 +2,7 @@
 
 A TypeScript reader/writer for RMG-K's `.rmgr` replay file format — per-match
 recordings of controller inputs and in-memory game state for
-*Super Smash Bros. (N64) — Smash Remix*.
+_Super Smash Bros. (N64) — Smash Remix_.
 
 The full on-disk format is documented in
 [`docs/RMGR_SPEC.md`](docs/RMGR_SPEC.md). This package is a faithful
@@ -83,7 +83,7 @@ to be explicit).
 ### Parsing
 
 ```ts
-function parseReplay(data: Uint8Array): Replay
+function parseReplay(data: Uint8Array): Replay;
 ```
 
 Parses a complete `.rmgr` file. Throws `ReplayParseError` for structurally
@@ -101,7 +101,7 @@ match apart from an interrupted recording.
 ### Serializing
 
 ```ts
-function serializeReplay(replay: SerializableReplay): Uint8Array
+function serializeReplay(replay: SerializableReplay): Uint8Array;
 ```
 
 Builds a complete `.rmgr` file in memory in one pass. `replay.frames` does
@@ -110,7 +110,7 @@ with no `GameEnd` event — useful for constructing test fixtures that
 exercise the "truncated recording" path.
 
 Unlike the streaming C++ writer (which has to write `streamLength: 0` and
-patch it in place later, for crash safety during a *live* recording), this
+patch it in place later, for crash safety during a _live_ recording), this
 function always knows the true length up front and writes it directly.
 The two writers are wire-compatible: given the same logical data, they
 produce byte-identical files.
@@ -118,9 +118,9 @@ produce byte-identical files.
 ### Querying a parsed replay
 
 ```ts
-function getFrame(replay: Replay, frameNumber: number): Frame | undefined
-function getPortTimeline(replay: Replay, port: PortIndex): readonly PortFrame[]
-function getSeatedPorts(replay: Replay): readonly PortIndex[]
+function getFrame(replay: Replay, frameNumber: number): Frame | undefined;
+function getPortTimeline(replay: Replay, port: PortIndex): readonly PortFrame[];
+function getSeatedPorts(replay: Replay): readonly PortIndex[];
 ```
 
 `replay.frames` is a plain sorted array and is always safe to iterate
@@ -148,7 +148,13 @@ replace it.
 ### Constants
 
 ```ts
-import { ButtonBit, hasButton, EventCode, FORMAT_VERSION, MAGIC } from "@rmg-k/rmgr";
+import {
+  ButtonBit,
+  hasButton,
+  EventCode,
+  FORMAT_VERSION,
+  MAGIC,
+} from "@rmg-k/rmgr";
 
 hasButton(preFrame.buttons, ButtonBit.A); // true if A is held
 ```

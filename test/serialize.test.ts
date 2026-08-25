@@ -19,7 +19,11 @@ const FIXTURE_RECORDED_AT_EPOCH_SECONDS = 1_766_000_000;
  */
 function buildExpectedBytes(): Uint8Array {
   const EVENT_STREAM_SIZE =
-    14 /* EventPayloads */ + (1 + 164) /* GameStart */ + (1 + 9) /* PreFrame */ + (1 + 50) /* PostFrame */ + (1 + 5); /* GameEnd */
+    14 /* EventPayloads */ +
+    (1 + 164) /* GameStart */ +
+    (1 + 9) /* PreFrame */ +
+    (1 + 50) /* PostFrame */ +
+    (1 + 5); /* GameEnd */
   const TOTAL_SIZE = HEADER_SIZE /* header */ + EVENT_STREAM_SIZE;
 
   const buf = new ArrayBuffer(TOTAL_SIZE);
@@ -115,9 +119,18 @@ function buildExpectedBytes(): Uint8Array {
   // --- GameStart appended fields (docs/RMGR_SPEC.md section 4.2, offsets 0x96-0xA3) ---
   putU8(1); // teamsEnabled
   putU8(1); // handicapMode: on
-  putU8(1); putU8(2); putU8(0); putU8(0); // portTeam
-  putU8(10); putU8(20); putU8(0); putU8(0); // portHandicap
-  putU8(0); putU8(0); putU8(0); putU8(0); // portCpuLevel (both human, meaningless)
+  putU8(1);
+  putU8(2);
+  putU8(0);
+  putU8(0); // portTeam
+  putU8(10);
+  putU8(20);
+  putU8(0);
+  putU8(0); // portHandicap
+  putU8(0);
+  putU8(0);
+  putU8(0);
+  putU8(0); // portCpuLevel (both human, meaningless)
 
   // --- PreFrameUpdate (0x03), frame 0, port 0 ---
   putU8(0x03);
@@ -176,10 +189,42 @@ const FIXTURE: SerializableReplay = {
     teamsEnabled: true,
     handicapMode: "on",
     ports: [
-      { slotType: "human", characterId: 0x0b, costumeId: 0, teamColor: 0, team: 1, handicap: 10, cpuLevel: 0 },
-      { slotType: "human", characterId: 0x01, costumeId: 0, teamColor: 0, team: 2, handicap: 20, cpuLevel: 0 },
-      { slotType: "empty", characterId: 0, costumeId: 0, teamColor: 0, team: 0, handicap: 0, cpuLevel: 0 },
-      { slotType: "empty", characterId: 0, costumeId: 0, teamColor: 0, team: 0, handicap: 0, cpuLevel: 0 },
+      {
+        slotType: "human",
+        characterId: 0x0b,
+        costumeId: 0,
+        teamColor: 0,
+        team: 1,
+        handicap: 10,
+        cpuLevel: 0,
+      },
+      {
+        slotType: "human",
+        characterId: 0x01,
+        costumeId: 0,
+        teamColor: 0,
+        team: 2,
+        handicap: 20,
+        cpuLevel: 0,
+      },
+      {
+        slotType: "empty",
+        characterId: 0,
+        costumeId: 0,
+        teamColor: 0,
+        team: 0,
+        handicap: 0,
+        cpuLevel: 0,
+      },
+      {
+        slotType: "empty",
+        characterId: 0,
+        costumeId: 0,
+        teamColor: 0,
+        team: 0,
+        handicap: 0,
+        cpuLevel: 0,
+      },
     ],
     playerNames: ["Alice", "Bob", "", ""],
   },
@@ -235,7 +280,11 @@ describe("serializeReplay wire format", () => {
 
   it("writes streamLength as the byte count after the header", () => {
     const bytes = serializeReplay(FIXTURE);
-    const streamLength = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(8, true);
+    const streamLength = new DataView(
+      bytes.buffer,
+      bytes.byteOffset,
+      bytes.byteLength,
+    ).getUint32(8, true);
     expect(streamLength).toBe(bytes.byteLength - HEADER_SIZE);
   });
 });

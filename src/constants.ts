@@ -57,7 +57,8 @@ export const EVENT_PAYLOAD_SIZES: Readonly<Record<EventCode, number>> = {
 export const GAME_START_BASE_SIZE = 150;
 
 /** Byte length of the fields appended after `GAME_START_BASE_SIZE`. */
-export const GAME_START_APPENDED_SIZE = EVENT_PAYLOAD_SIZES[EventCode.GameStart] - GAME_START_BASE_SIZE;
+export const GAME_START_APPENDED_SIZE =
+  EVENT_PAYLOAD_SIZES[EventCode.GameStart] - GAME_START_BASE_SIZE;
 
 /**
  * `PostFrameUpdate`'s original, pre-field-append size (docs/RMGR_SPEC.md
@@ -70,7 +71,8 @@ export const GAME_START_APPENDED_SIZE = EVENT_PAYLOAD_SIZES[EventCode.GameStart]
 export const POST_FRAME_BASE_SIZE = 42;
 
 /** Byte length of the fields appended after `POST_FRAME_BASE_SIZE`. */
-export const POST_FRAME_APPENDED_SIZE = EVENT_PAYLOAD_SIZES[EventCode.PostFrameUpdate] - POST_FRAME_BASE_SIZE;
+export const POST_FRAME_APPENDED_SIZE =
+  EVENT_PAYLOAD_SIZES[EventCode.PostFrameUpdate] - POST_FRAME_BASE_SIZE;
 
 /** Controller button bits for `PreFrameUpdate.buttons`. */
 export const ButtonBit = {

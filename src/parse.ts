@@ -42,7 +42,9 @@ function readPortTuple<T>(read: () => T): readonly [T, T, T, T] {
 function parseHeader(reader: BinaryReader): ReplayHeader {
   const magic = new TextDecoder("ascii").decode(reader.readBytes(4));
   if (magic !== MAGIC) {
-    throw new ReplayParseError(`bad magic bytes: expected "${MAGIC}", got "${magic}"`);
+    throw new ReplayParseError(
+      `bad magic bytes: expected "${MAGIC}", got "${magic}"`,
+    );
   }
   const version = reader.readU8();
   if (version !== FORMAT_VERSION) {
@@ -56,7 +58,13 @@ function parseHeader(reader: BinaryReader): ReplayHeader {
   const goodName = reader.readFixedUtf8String(GOOD_NAME_WIDTH);
   const recorderSchemaVersion = reader.readU32();
   const recordedAtEpochSeconds = reader.readU64();
-  return { version, streamLength, goodName, recorderSchemaVersion, recordedAtEpochSeconds };
+  return {
+    version,
+    streamLength,
+    goodName,
+    recorderSchemaVersion,
+    recordedAtEpochSeconds,
+  };
 }
 
 /** Returns a map of event code -> declared payload size. */
@@ -72,7 +80,9 @@ function parseEventPayloads(reader: BinaryReader): Map<number, number> {
 }
 
 /** The original 4-byte per-port sub-struct (docs/RMGR_SPEC.md section 4.2's `PortSettings` table) - not the full, appended-fields-merged `PortSettings` type this package exposes. */
-function parseBasePortSettings(reader: BinaryReader): Omit<PortSettings, "team" | "handicap" | "cpuLevel"> {
+function parseBasePortSettings(
+  reader: BinaryReader,
+): Omit<PortSettings, "team" | "handicap" | "cpuLevel"> {
   const slotType = slotTypeFromWire(reader.readU8());
   const characterId = reader.readU8();
   const costumeId = reader.readU8();
@@ -97,7 +107,9 @@ function parseGameStart(reader: BinaryReader, declaredSize: number): GameStart {
   const damageRatio = reader.readU8();
   const itemFrequency = reader.readU8();
   const baseSettings = readPortTuple(() => parseBasePortSettings(reader));
-  const playerNames = readPortTuple(() => reader.readFixedString(PLAYER_NAME_WIDTH));
+  const playerNames = readPortTuple(() =>
+    reader.readFixedString(PLAYER_NAME_WIDTH),
+  );
 
   let teamsEnabled = false;
   let handicapMode: HandicapMode = "off";
@@ -131,12 +143,12 @@ function parseGameStart(reader: BinaryReader, declaredSize: number): GameStart {
     handicap: portHandicap[i] ?? 0,
     cpuLevel: portCpuLevel[i] ?? 0,
   });
-  const ports: readonly [PortSettings, PortSettings, PortSettings, PortSettings] = [
-    mergePort(0),
-    mergePort(1),
-    mergePort(2),
-    mergePort(3),
-  ];
+  const ports: readonly [
+    PortSettings,
+    PortSettings,
+    PortSettings,
+    PortSettings,
+  ] = [mergePort(0), mergePort(1), mergePort(2), mergePort(3)];
 
   return {
     stageId,
@@ -161,7 +173,10 @@ function parsePreFrame(reader: BinaryReader): PreFrameUpdate {
   return { frame, port, buttons, stickX, stickY };
 }
 
-function parsePostFrame(reader: BinaryReader, declaredSize: number): PostFrameUpdate {
+function parsePostFrame(
+  reader: BinaryReader,
+  declaredSize: number,
+): PostFrameUpdate {
   const start = reader.position;
   const frame = reader.readI32();
   const port = reader.readU8() as PortIndex;
@@ -248,7 +263,10 @@ export function parseReplay(data: Uint8Array): Replay {
   const reader = new BinaryReader(data);
   const header = parseHeader(reader);
 
-  const streamEnd = header.streamLength > 0 ? HEADER_SIZE + header.streamLength : data.byteLength;
+  const streamEnd =
+    header.streamLength > 0
+      ? HEADER_SIZE + header.streamLength
+      : data.byteLength;
 
   const firstCode = reader.readU8();
   if (firstCode !== EventCode.EventPayloads) {
@@ -263,7 +281,10 @@ export function parseReplay(data: Uint8Array): Replay {
   let gameEnd: GameEnd | null = null;
   const frameEntries = new Map<number, Map<PortIndex, MutableFrameEntry>>();
 
-  const entryFor = (frameNumber: number, port: PortIndex): MutableFrameEntry => {
+  const entryFor = (
+    frameNumber: number,
+    port: PortIndex,
+  ): MutableFrameEntry => {
     let ports = frameEntries.get(frameNumber);
     if (!ports) {
       ports = new Map();
@@ -277,13 +298,18 @@ export function parseReplay(data: Uint8Array): Replay {
     return entry;
   };
 
-  while (reader.position < Math.min(streamEnd, data.byteLength) && reader.hasMore()) {
+  while (
+    reader.position < Math.min(streamEnd, data.byteLength) &&
+    reader.hasMore()
+  ) {
     const code = reader.readU8();
     switch (code) {
       case EventCode.GameStart: {
         const declaredGameStartSize = declaredSizes.get(EventCode.GameStart);
         if (declaredGameStartSize === undefined) {
-          throw new ReplayParseError("EventPayloads doesn't declare a size for GameStart");
+          throw new ReplayParseError(
+            "EventPayloads doesn't declare a size for GameStart",
+          );
         }
         gameStart = parseGameStart(reader, declaredGameStartSize);
         break;
@@ -294,9 +320,13 @@ export function parseReplay(data: Uint8Array): Replay {
         break;
       }
       case EventCode.PostFrameUpdate: {
-        const declaredPostFrameSize = declaredSizes.get(EventCode.PostFrameUpdate);
+        const declaredPostFrameSize = declaredSizes.get(
+          EventCode.PostFrameUpdate,
+        );
         if (declaredPostFrameSize === undefined) {
-          throw new ReplayParseError("EventPayloads doesn't declare a size for PostFrameUpdate");
+          throw new ReplayParseError(
+            "EventPayloads doesn't declare a size for PostFrameUpdate",
+          );
         }
         const post = parsePostFrame(reader, declaredPostFrameSize);
         entryFor(post.frame, post.port).post = post;
@@ -326,13 +356,17 @@ export function parseReplay(data: Uint8Array): Replay {
   const frames: Frame[] = frameNumbers.map((frameNumber) => {
     const portEntries = frameEntries.get(frameNumber);
     if (!portEntries) {
-      throw new ReplayParseError(`internal error: no port entries for frame ${frameNumber}`);
+      throw new ReplayParseError(
+        `internal error: no port entries for frame ${frameNumber}`,
+      );
     }
     const ports: Partial<Record<PortIndex, FramePortData>> = {};
     for (const [port, entry] of portEntries) {
       if (!entry.pre || !entry.post) {
         const missing = entry.pre ? "PostFrameUpdate" : "PreFrameUpdate";
-        throw new ReplayParseError(`frame ${frameNumber} port ${port} is missing its ${missing}`);
+        throw new ReplayParseError(
+          `frame ${frameNumber} port ${port} is missing its ${missing}`,
+        );
       }
       ports[port] = { pre: entry.pre, post: entry.post };
     }
