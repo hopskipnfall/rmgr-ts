@@ -4,6 +4,10 @@ A TypeScript reader/writer for RMG-K's `.rmgr` replay file format — per-match
 recordings of controller inputs and in-memory game state for
 _Super Smash Bros. (N64) — Smash Remix_.
 
+> This is an unofficial, fan-made project and is not affiliated with,
+> endorsed by, or sponsored by Nintendo. "Super Smash Bros." and other
+> referenced trademarks are the property of their respective owners.
+
 The full on-disk format is documented in
 [`docs/RMGR_SPEC.md`](docs/RMGR_SPEC.md). This package is a faithful
 implementation of that spec, not a reinterpretation of it — if the two ever
