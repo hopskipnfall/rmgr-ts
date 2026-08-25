@@ -5,10 +5,16 @@ recordings of controller inputs and in-memory game state for
 *Super Smash Bros. (N64) — Smash Remix*.
 
 The full on-disk format is documented in
-[`docs/RMGR_SPEC.md`](https://github.com/hopskipnfall/RMG-K/blob/master/docs/RMGR_SPEC.md)
-in the main [`RMG-K`](https://github.com/hopskipnfall/RMG-K) repository. This
-package is a faithful implementation of that spec, not a reinterpretation of
-it — if the two ever disagree, that's a bug.
+[`docs/RMGR_SPEC.md`](docs/RMGR_SPEC.md). This package is a faithful
+implementation of that spec, not a reinterpretation of it — if the two ever
+disagree, that's a bug.
+
+> `docs/RMGR_SPEC.md` is currently a copy of the same file in the main
+> [`RMG-K`](https://github.com/hopskipnfall/RMG-K) repository
+> (`docs/RMGR_SPEC.md` there, where the C++ recorder that writes this format
+> lives). The intent is for this repository to become the spec's canonical
+> home and for `RMG-K`'s copy to eventually be removed in favor of this one —
+> until then, keep the two in sync by hand if either changes.
 
 > Not yet published to npm. It has no dependency on the C++ build, and lives
 > in its own repository, separate from `RMG-K`.
@@ -193,3 +199,17 @@ Three kinds of coverage, deliberately not overlapping:
   (bad magic, missing `GameStart`, an unrecognized event code with and
   without a declared size to skip by, a truncated/`streamLength: 0` file,
   and an unpaired `PreFrameUpdate`/`PostFrameUpdate`).
+
+## Acknowledgements
+
+The `.rmgr` file format itself — a self-describing binary event stream, with
+`PreFrameUpdate`/`PostFrameUpdate`/`GameEnd` events named and shaped after
+Slippi's own — is explicitly modeled on
+[Project Slippi](https://github.com/project-slippi)'s `.slp` replay format
+for Super Smash Bros. Melee (see `docs/RMGR_SPEC.md` §1). It is not
+byte-compatible with `.slp`, and departs from it in several deliberate ways,
+but the overall design owes a real debt to Slippi's. This package's own API
+shape is also a deliberate departure from
+[`slippi-js`](https://github.com/project-slippi/slippi-js)'s `SlippiGame`
+class (see Design notes above) — credit to that project regardless, for
+having done this well first.
