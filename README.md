@@ -8,6 +8,11 @@ _Super Smash Bros. (N64) — Smash Remix_.
 > endorsed by, or sponsored by Nintendo. "Super Smash Bros." and other
 > referenced trademarks are the property of their respective owners.
 
+> **Alpha software.** This package and the `.rmgr` format it implements are
+> under active early development and subject to change without notice.
+> Replay files created with the current version of RMG-K are not guaranteed
+> to keep working with future versions of this package, or vice versa.
+
 The full on-disk format is documented in
 [`docs/RMGR_SPEC.md`](docs/RMGR_SPEC.md). This package is a faithful
 implementation of that spec, not a reinterpretation of it — if the two ever
