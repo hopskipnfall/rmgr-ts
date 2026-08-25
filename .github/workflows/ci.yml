@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Not 18 or 20: vitest 4's rolldown dependency imports node:util's
+        # styleText, which isn't available on either (empirically - not just
+        # 18, which never has it, but also the latest 20.x LTS as of this
+        # writing, despite vitest's own package.json engines field claiming
+        # ^20.0.0 support). This is a test-tooling constraint only - the
+        # published package (dist/, no vitest dependency) still targets
+        # Node >=18, see package.json's own engines field.
+        node-version: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run lint
+      - run: npm run format:check

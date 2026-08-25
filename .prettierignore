@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+
+# Verbatim copy of RMG-K's docs/RMGR_SPEC.md - not reformatted here so it
+# stays a byte-for-byte-comparable copy (see README's note on keeping the
+# two in sync).
+docs/RMGR_SPEC.md
