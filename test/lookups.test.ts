@@ -3,6 +3,7 @@ import {
   ActionStateId,
   CharacterId,
   getActionStateName,
+  getCharacterGroup,
   getCharacterName,
   getGameDefinitions,
   getStageName,
@@ -10,13 +11,17 @@ import {
   isFoxCharacter,
   isGrabState,
   isJigglypuffCharacter,
+  isJPOriginal12,
   isLedgeState,
   isMarioCharacter,
+  isNAOriginal12,
   isNessCharacter,
   isShieldBreakState,
   isShieldState,
   isShieldStunState,
   isYoshiCharacter,
+  JP_ORIGINAL_12_IDS,
+  NA_ORIGINAL_12_IDS,
   StageId,
 } from "../src/index.js";
 
@@ -72,6 +77,36 @@ describe("Character lookups", () => {
     expect(isMarioCharacter(CharacterId.PolygonMario)).toBe(true);
     expect(isMarioCharacter(CharacterId.MarioJP)).toBe(true);
     expect(isMarioCharacter(CharacterId.Luigi)).toBe(false);
+  });
+
+  it("classifies NA original 12, JP original 12, and remix character groups", () => {
+    expect(NA_ORIGINAL_12_IDS).toHaveLength(12);
+    expect(JP_ORIGINAL_12_IDS).toHaveLength(12);
+
+    // NA Original 12
+    for (const id of NA_ORIGINAL_12_IDS) {
+      expect(isNAOriginal12(id)).toBe(true);
+      expect(isJPOriginal12(id)).toBe(false);
+      expect(getCharacterGroup(id)).toBe("na");
+    }
+
+    // JP Original 12
+    for (const id of JP_ORIGINAL_12_IDS) {
+      expect(isNAOriginal12(id)).toBe(false);
+      expect(isJPOriginal12(id)).toBe(true);
+      expect(getCharacterGroup(id)).toBe("jp");
+    }
+
+    // Remix / Extra characters
+    expect(isNAOriginal12(CharacterId.Falco)).toBe(false);
+    expect(isJPOriginal12(CharacterId.Falco)).toBe(false);
+    expect(getCharacterGroup(CharacterId.Falco)).toBe("remix");
+
+    expect(getCharacterGroup(CharacterId.MetalMario)).toBe("remix");
+    expect(getCharacterGroup(CharacterId.PolygonMario)).toBe("remix");
+    expect(getCharacterGroup(CharacterId.Piano)).toBe("remix");
+    expect(getCharacterGroup(CharacterId.GiantDK)).toBe("remix");
+    expect(getCharacterGroup(CharacterId.Mewtwo)).toBe("remix");
   });
 });
 

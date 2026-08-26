@@ -19,18 +19,23 @@ export {
   CHARACTER_NAMES,
   CHARACTER_NAMES_JA,
   GoodName,
+  JP_ORIGINAL_12_IDS,
+  NA_ORIGINAL_12_IDS,
   StageId,
   STAGE_NAMES,
   STAGE_NAMES_JA,
   getActionStateName,
+  getCharacterGroup,
   getCharacterName,
   getGameDefinitions,
   getStageName,
   isFoxCharacter,
   isGrabState,
   isJigglypuffCharacter,
+  isJPOriginal12,
   isLedgeState,
   isMarioCharacter,
+  isNAOriginal12,
   isNessCharacter,
   isShieldBreakState,
   isShieldState,
@@ -38,7 +43,12 @@ export {
   isYoshiCharacter,
 } from "./lookups.js";
 
-export type { GameDefinitions, Language, LookupOptions } from "./lookups.js";
+export type {
+  CharacterGroup,
+  GameDefinitions,
+  Language,
+  LookupOptions,
+} from "./lookups.js";
 
 export type {
   Frame,
