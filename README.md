@@ -173,6 +173,30 @@ hasButton(preFrame.buttons, ButtonBit.A); // true if A is held
 argument are set, so it also works for combinations, e.g.
 `hasButton(buttons, ButtonBit.A | ButtonBit.L)`.
 
+### Lookups & definitions
+
+```ts
+import {
+  CharacterId,
+  StageId,
+  ActionStateId,
+  getCharacterName,
+  getStageName,
+  getActionStateName,
+  isShieldState,
+  isShieldBreakState,
+  isGrabState,
+  isLedgeState,
+  isFoxCharacter,
+} from "@rmg-k/rmgr";
+
+getCharacterName(CharacterId.Fox); // "Fox"
+getCharacterName(CharacterId.Fox, "ja"); // "フォックス"
+getStageName(StageId.DreamLand); // "Dream Land"
+getActionStateName(ActionStateId.CliffCatch); // "CliffCatch"
+isLedgeState(post.actionStateId); // true if in a ledge animation
+```
+
 ## Design notes
 
 - **No classes, no hidden state.** `parseReplay`/`serializeReplay` are pure
