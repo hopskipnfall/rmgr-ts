@@ -122,6 +122,71 @@ export const CharacterId = {
 
 export type CharacterId = (typeof CharacterId)[keyof typeof CharacterId];
 
+export type CharacterGroup = "na" | "jp" | "remix";
+
+/**
+ * The original 12 North America release characters (NTSC-U / 0x00-0x0b).
+ */
+export const NA_ORIGINAL_12_IDS: readonly number[] = [
+  CharacterId.Mario, // 0x00
+  CharacterId.Fox, // 0x01
+  CharacterId.DonkeyKong, // 0x02
+  CharacterId.Samus, // 0x03
+  CharacterId.Luigi, // 0x04
+  CharacterId.Link, // 0x05
+  CharacterId.Yoshi, // 0x06
+  CharacterId.CaptainFalcon, // 0x07
+  CharacterId.Kirby, // 0x08
+  CharacterId.Pikachu, // 0x09
+  CharacterId.Jigglypuff, // 0x0a
+  CharacterId.Ness, // 0x0b
+];
+
+/**
+ * The original 12 Japan release characters (NTSC-J mechanics / 12 J variants in Remix).
+ */
+export const JP_ORIGINAL_12_IDS: readonly number[] = [
+  CharacterId.MarioJP, // 0x2a
+  CharacterId.FoxJP, // 0x29
+  CharacterId.DKJP, // 0x2c
+  CharacterId.SamusJP, // 0x24
+  CharacterId.LuigiJP, // 0x2b
+  CharacterId.LinkJP, // 0x27
+  CharacterId.YoshiJP, // 0x31
+  CharacterId.FalconJP, // 0x28
+  CharacterId.KirbyJP, // 0x30
+  CharacterId.PikachuJP, // 0x32
+  CharacterId.JigglypuffJP, // 0x2e
+  CharacterId.NessJP, // 0x25
+];
+
+export function isNAOriginal12Id(id: number): boolean {
+  return id >= 0x00 && id <= 0x0b;
+}
+
+export function isJPOriginal12Id(id: number): boolean {
+  return (
+    id === CharacterId.MarioJP ||
+    id === CharacterId.FoxJP ||
+    id === CharacterId.DKJP ||
+    id === CharacterId.SamusJP ||
+    id === CharacterId.LuigiJP ||
+    id === CharacterId.LinkJP ||
+    id === CharacterId.YoshiJP ||
+    id === CharacterId.FalconJP ||
+    id === CharacterId.KirbyJP ||
+    id === CharacterId.PikachuJP ||
+    id === CharacterId.JigglypuffJP ||
+    id === CharacterId.NessJP
+  );
+}
+
+export function getCharacterGroupId(id: number): CharacterGroup {
+  if (isNAOriginal12Id(id)) return "na";
+  if (isJPOriginal12Id(id)) return "jp";
+  return "remix";
+}
+
 export const CHARACTER_NAMES: Readonly<Record<number, string>> = {
   0x00: "Mario",
   0x01: "Fox",
@@ -795,6 +860,9 @@ export interface GameDefinitions {
   isShieldBreakState(id: number): boolean;
   isGrabState(id: number): boolean;
   isLedgeState(id: number): boolean;
+  isNAOriginal12(id: number): boolean;
+  isJPOriginal12(id: number): boolean;
+  getCharacterGroup(id: number): CharacterGroup;
 }
 
 const FTILT_RANGE: [number, number] = [0x0c1, 0x0c5];
@@ -948,6 +1016,18 @@ class StandardGameDefinitions implements GameDefinitions {
   isLedgeState(id: number): boolean {
     return id >= 0x054 && id <= 0x063;
   }
+
+  isNAOriginal12(id: number): boolean {
+    return isNAOriginal12Id(id);
+  }
+
+  isJPOriginal12(id: number): boolean {
+    return isJPOriginal12Id(id);
+  }
+
+  getCharacterGroup(id: number): CharacterGroup {
+    return getCharacterGroupId(id);
+  }
 }
 
 const definitionsCache = new Map<string, GameDefinitions>();
@@ -1027,4 +1107,19 @@ export function isGrabState(id: number, goodName?: string): boolean {
 
 export function isLedgeState(id: number, goodName?: string): boolean {
   return getGameDefinitions(goodName).isLedgeState(id);
+}
+
+export function isNAOriginal12(id: number, goodName?: string): boolean {
+  return getGameDefinitions(goodName).isNAOriginal12(id);
+}
+
+export function isJPOriginal12(id: number, goodName?: string): boolean {
+  return getGameDefinitions(goodName).isJPOriginal12(id);
+}
+
+export function getCharacterGroup(
+  id: number,
+  goodName?: string,
+): CharacterGroup {
+  return getGameDefinitions(goodName).getCharacterGroup(id);
 }
