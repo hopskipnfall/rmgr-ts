@@ -13,6 +13,7 @@ import {
 import type {
   GameEnd,
   GameStart,
+  ItemUpdate,
   PortIndex,
   PostFrameUpdate,
   PreFrameUpdate,
@@ -27,6 +28,7 @@ const EVENT_PAYLOADS_ENTRIES: ReadonlyArray<readonly [EventCode, number]> = [
   [EventCode.PreFrameUpdate, EVENT_PAYLOAD_SIZES[EventCode.PreFrameUpdate]],
   [EventCode.PostFrameUpdate, EVENT_PAYLOAD_SIZES[EventCode.PostFrameUpdate]],
   [EventCode.GameEnd, EVENT_PAYLOAD_SIZES[EventCode.GameEnd]],
+  [EventCode.ItemUpdate, EVENT_PAYLOAD_SIZES[EventCode.ItemUpdate]],
 ];
 
 function writeEventPayloads(w: BinaryWriter): void {
@@ -108,6 +110,16 @@ function writePostFrame(w: BinaryWriter, post: PostFrameUpdate): void {
   w.writeU32(post.comboDamage);
 }
 
+function writeItemUpdate(w: BinaryWriter, item: ItemUpdate): void {
+  w.writeU8(EventCode.ItemUpdate);
+  w.writeI32(item.frame);
+  w.writeU32(item.objectAddress);
+  w.writeU32(item.typeId);
+  w.writeF32(item.positionX);
+  w.writeF32(item.positionY);
+  w.writeF32(item.positionZ);
+}
+
 function writeGameEnd(w: BinaryWriter, gameEnd: GameEnd): void {
   w.writeU8(EventCode.GameEnd);
   w.writeU8(gameEndReasonToWire(gameEnd.endReason));
@@ -145,6 +157,9 @@ export function serializeReplay(replay: SerializableReplay): Uint8Array {
       }
       writePreFrame(eventStream, portData.pre);
       writePostFrame(eventStream, portData.post);
+    }
+    for (const item of frame.items) {
+      writeItemUpdate(eventStream, item);
     }
   }
 

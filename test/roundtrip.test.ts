@@ -5,6 +5,7 @@ import {
   makeFrame,
   makeGameEnd,
   makeGameStart,
+  makeItemUpdate,
   makeReplay,
 } from "./fixtures.js";
 
@@ -123,6 +124,32 @@ describe("serializeReplay -> parseReplay round trip", () => {
     expect(parsed.gameEnd?.endReason).toBe("aborted");
   });
 
+  it("round-trips ItemUpdate events, including multiple items on the same frame", () => {
+    const items0 = [
+      makeItemUpdate({
+        frame: 0,
+        objectAddress: 0x80123456,
+        typeId: 0x05,
+        positionX: 12.5,
+        positionY: -3.25,
+        positionZ: 0.75,
+      }),
+      makeItemUpdate({
+        frame: 0,
+        objectAddress: 0x80123500,
+        typeId: 0x21,
+      }),
+    ];
+    const input = makeReplay({
+      frames: [makeFrame(0, [0, 1], items0), makeFrame(1, [0, 1])],
+    });
+    const bytes = serializeReplay(input);
+    const parsed = parseReplay(bytes);
+
+    expect(parsed.frames[0]?.items).toEqual(items0);
+    expect(parsed.frames[1]?.items).toEqual([]);
+  });
+
   it("round-trips negative facing direction, negative velocity, and non-grounded state", () => {
     const frame = makeFrame(5, [0]);
     const post = frame.ports[0]!.post;
@@ -142,6 +169,7 @@ describe("serializeReplay -> parseReplay round trip", () => {
               },
             },
           },
+          items: [],
         },
       ],
     });

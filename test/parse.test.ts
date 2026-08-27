@@ -76,8 +76,8 @@ describe("parseReplay error handling", () => {
     w.writeU8(0x42);
     w.writeBytes(new Uint8Array([1, 2, 3, 4, 5, 6]));
 
-    // Re-use the real GameStart bytes from `base`: header(HEADER_SIZE) + EventPayloads event: code(1) + count(1) + 4 entries * 3 bytes each (12) = 14
-    const gameStartEventStart = HEADER_SIZE + 14;
+    // Re-use the real GameStart bytes from `base`: header(HEADER_SIZE) + EventPayloads event: code(1) + count(1) + 5 entries * 3 bytes each (15) = 17
+    const gameStartEventStart = HEADER_SIZE + 17;
     w.writeBytes(
       base.subarray(gameStartEventStart, gameStartEventStart + 1 + 164),
     );
@@ -120,8 +120,8 @@ describe("parseReplay error handling", () => {
     w.writeU16(5);
 
     const base = serializeReplay(makeReplay({ frames: [], gameEnd: null }));
-    // header(HEADER_SIZE) + EventPayloads event: code(1) + count(1) + 4 entries * 3 bytes each (12) = 14
-    const gameStartEventStart = HEADER_SIZE + 14;
+    // header(HEADER_SIZE) + EventPayloads event: code(1) + count(1) + 5 entries * 3 bytes each (15) = 17
+    const gameStartEventStart = HEADER_SIZE + 17;
     w.writeBytes(
       base.subarray(gameStartEventStart, gameStartEventStart + 1 + 164),
     );
@@ -167,7 +167,7 @@ describe("parseReplay error handling", () => {
     const full = serializeReplay(
       makeReplay({ gameStart: makeGameStart(), frames: [], gameEnd: null }),
     );
-    const gameStartEventStart = HEADER_SIZE + 14; // header(HEADER_SIZE) + EventPayloads event (14)
+    const gameStartEventStart = HEADER_SIZE + 17; // header(HEADER_SIZE) + EventPayloads event (17)
     const oldGameStartPayload = full.subarray(
       gameStartEventStart + 1,
       gameStartEventStart + 1 + GAME_START_BASE_SIZE,
@@ -204,7 +204,7 @@ describe("parseReplay error handling", () => {
     const full = serializeReplay(
       makeReplay({ frames: [makeFrame(0, [0])], gameEnd: null }),
     );
-    const gameStartEventStart = HEADER_SIZE + 14; // header(HEADER_SIZE) + EventPayloads event (14)
+    const gameStartEventStart = HEADER_SIZE + 17; // header(HEADER_SIZE) + EventPayloads event (17)
     const preFrameEventStart = gameStartEventStart + (1 + 164);
     const postFrameEventStart = preFrameEventStart + (1 + 9);
     const oldPostFramePayload = full.subarray(
