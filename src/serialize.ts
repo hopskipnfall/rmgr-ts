@@ -158,7 +158,7 @@ export function serializeReplay(replay: SerializableReplay): Uint8Array {
       writePreFrame(eventStream, portData.pre);
       writePostFrame(eventStream, portData.post);
     }
-    for (const item of frame.items) {
+    for (const item of frame.items ?? []) {
       writeItemUpdate(eventStream, item);
     }
   }

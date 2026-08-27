@@ -180,13 +180,16 @@ export interface ItemUpdate {
  * One recorded frame. `ports` only has entries for ports that were seated
  * and live that frame — never assume all four are present. `items` is
  * every `ItemUpdate` recorded for this frame, in the order they appeared in
- * the file — empty if nothing was live on the item/hazard/projectile list
- * that frame, or if this file predates recorder schema v2.
+ * the file. `parseReplay` always returns an array here (empty if nothing
+ * was live on the item/hazard/projectile list that frame, or if this file
+ * predates recorder schema v2) — declared optional only so code that
+ * hand-constructs a `Frame` (tests, older callers) isn't forced to specify
+ * it; treat a missing `items` the same as an empty array.
  */
 export interface Frame {
   readonly frame: number;
   readonly ports: Readonly<Partial<Record<PortIndex, FramePortData>>>;
-  readonly items: readonly ItemUpdate[];
+  readonly items?: readonly ItemUpdate[];
 }
 
 /**
