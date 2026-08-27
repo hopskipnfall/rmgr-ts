@@ -56,6 +56,7 @@ export type {
   GameEnd,
   GameEndReason,
   GameStart,
+  ItemUpdate,
   PortIndex,
   PortSettings,
   PostFrameUpdate,

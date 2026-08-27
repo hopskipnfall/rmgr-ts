@@ -140,12 +140,53 @@ export interface FramePortData {
 }
 
 /**
+ * One live object on the shared item/hazard/projectile list, for a single
+ * frame — see `docs/RMGR_SPEC.md` §4.6. Covers everything on that list, not
+ * just character-special-move projectiles: spawned items and stage hazard
+ * objects (thrown bananas, Poké Balls, Waddle Dees, ...) share the same
+ * list and currently can't be told apart from a projectile by `typeId`
+ * alone. Absent (empty `Frame.items`) in a file recorded before schema v2 —
+ * see `ReplayHeader.recorderSchemaVersion`.
+ */
+export interface ItemUpdate {
+  readonly frame: number;
+  /**
+   * The object's own RDRAM address at recording time — not a semantic
+   * spawn ID the engine assigns, just the closest available stable
+   * per-object identity. Valid for as long as that object was alive; the
+   * address can be reused once an object is freed, so don't assume two
+   * `ItemUpdate`s with the same `objectAddress` across widely-separated
+   * frames are the same object.
+   */
+  readonly objectAddress: number;
+  /**
+   * Raw value read from the object. `0x00`-`0x1F` is the vanilla
+   * item/projectile ID range, `0x20`+ is Remix-added — see
+   * `docs/RMGR_SPEC.md` §7.6. **There is currently no name lookup table for
+   * these IDs** — this is a bare number, not `"boomerang"` or `"bomb"`.
+   */
+  readonly typeId: number;
+  readonly positionX: number;
+  readonly positionY: number;
+  /**
+   * Read using the same object→topjoint indirection as X/Y, but *not*
+   * independently confirmed to be correct for this specific field — see
+   * `docs/RMGR_SPEC.md` §4.6. Treat with more skepticism than X/Y.
+   */
+  readonly positionZ: number;
+}
+
+/**
  * One recorded frame. `ports` only has entries for ports that were seated
- * and live that frame — never assume all four are present.
+ * and live that frame — never assume all four are present. `items` is
+ * every `ItemUpdate` recorded for this frame, in the order they appeared in
+ * the file — empty if nothing was live on the item/hazard/projectile list
+ * that frame, or if this file predates recorder schema v2.
  */
 export interface Frame {
   readonly frame: number;
   readonly ports: Readonly<Partial<Record<PortIndex, FramePortData>>>;
+  readonly items: readonly ItemUpdate[];
 }
 
 /**

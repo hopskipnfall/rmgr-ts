@@ -18,6 +18,7 @@ import type {
   GameEnd,
   GameStart,
   HandicapMode,
+  ItemUpdate,
   PortIndex,
   PortSettings,
   PostFrameUpdate,
@@ -241,6 +242,29 @@ function parseGameEnd(reader: BinaryReader): GameEnd {
   return { endReason, placements };
 }
 
+function parseItemUpdate(
+  reader: BinaryReader,
+  declaredSize: number,
+): ItemUpdate {
+  const start = reader.position;
+  const frame = reader.readI32();
+  const objectAddress = reader.readU32();
+  const typeId = reader.readU32();
+  const positionX = reader.readF32();
+  const positionY = reader.readF32();
+  const positionZ = reader.readF32();
+
+  // Forward-compat: skip anything a future schema version appends to this
+  // event that this parser doesn't understand yet - same mechanism as the
+  // top-level event loop.
+  const stillUnread = declaredSize - (reader.position - start);
+  if (stillUnread > 0) {
+    reader.skip(stillUnread);
+  }
+
+  return { frame, objectAddress, typeId, positionX, positionY, positionZ };
+}
+
 interface MutableFrameEntry {
   pre?: PreFrameUpdate;
   post?: PostFrameUpdate;
@@ -280,6 +304,7 @@ export function parseReplay(data: Uint8Array): Replay {
   let gameStart: GameStart | undefined;
   let gameEnd: GameEnd | null = null;
   const frameEntries = new Map<number, Map<PortIndex, MutableFrameEntry>>();
+  const itemsByFrame = new Map<number, ItemUpdate[]>();
 
   const entryFor = (
     frameNumber: number,
@@ -335,6 +360,22 @@ export function parseReplay(data: Uint8Array): Replay {
       case EventCode.GameEnd:
         gameEnd = parseGameEnd(reader);
         break;
+      case EventCode.ItemUpdate: {
+        const declaredItemUpdateSize = declaredSizes.get(EventCode.ItemUpdate);
+        if (declaredItemUpdateSize === undefined) {
+          throw new ReplayParseError(
+            "EventPayloads doesn't declare a size for ItemUpdate",
+          );
+        }
+        const item = parseItemUpdate(reader, declaredItemUpdateSize);
+        let items = itemsByFrame.get(item.frame);
+        if (!items) {
+          items = [];
+          itemsByFrame.set(item.frame, items);
+        }
+        items.push(item);
+        break;
+      }
       default: {
         const size = declaredSizes.get(code);
         if (size === undefined) {
@@ -352,25 +393,29 @@ export function parseReplay(data: Uint8Array): Replay {
     throw new ReplayParseError("file has no GameStart event");
   }
 
-  const frameNumbers = [...frameEntries.keys()].sort((a, b) => a - b);
+  // Union, not just frameEntries' keys: an ItemUpdate could in principle
+  // land on a frame with no seated-port pre/post pair recorded (e.g. every
+  // port momentarily failing the recorder's own validity check) - rare, but
+  // an item shouldn't silently vanish if it does happen.
+  const frameNumbers = [
+    ...new Set([...frameEntries.keys(), ...itemsByFrame.keys()]),
+  ].sort((a, b) => a - b);
   const frames: Frame[] = frameNumbers.map((frameNumber) => {
     const portEntries = frameEntries.get(frameNumber);
-    if (!portEntries) {
-      throw new ReplayParseError(
-        `internal error: no port entries for frame ${frameNumber}`,
-      );
-    }
     const ports: Partial<Record<PortIndex, FramePortData>> = {};
-    for (const [port, entry] of portEntries) {
-      if (!entry.pre || !entry.post) {
-        const missing = entry.pre ? "PostFrameUpdate" : "PreFrameUpdate";
-        throw new ReplayParseError(
-          `frame ${frameNumber} port ${port} is missing its ${missing}`,
-        );
+    if (portEntries) {
+      for (const [port, entry] of portEntries) {
+        if (!entry.pre || !entry.post) {
+          const missing = entry.pre ? "PostFrameUpdate" : "PreFrameUpdate";
+          throw new ReplayParseError(
+            `frame ${frameNumber} port ${port} is missing its ${missing}`,
+          );
+        }
+        ports[port] = { pre: entry.pre, post: entry.post };
       }
-      ports[port] = { pre: entry.pre, post: entry.post };
     }
-    return { frame: frameNumber, ports };
+    const items = itemsByFrame.get(frameNumber) ?? [];
+    return { frame: frameNumber, ports, items };
   });
 
   return {

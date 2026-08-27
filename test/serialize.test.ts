@@ -19,11 +19,14 @@ const FIXTURE_RECORDED_AT_EPOCH_SECONDS = 1_766_000_000;
  */
 function buildExpectedBytes(): Uint8Array {
   const EVENT_STREAM_SIZE =
-    14 /* EventPayloads */ +
+    17 /* EventPayloads (5 declared entries: 1 + 5*3) */ +
     (1 + 164) /* GameStart */ +
     (1 + 9) /* PreFrame */ +
     (1 + 50) /* PostFrame */ +
     (1 + 5); /* GameEnd */
+  // No ItemUpdate events themselves - the fixture frame has no items - only
+  // EventPayloads' declared entry for it (schema v2's writer always
+  // declares it, even for a match with no items ever recorded).
   const TOTAL_SIZE = HEADER_SIZE /* header */ + EVENT_STREAM_SIZE;
 
   const buf = new ArrayBuffer(TOTAL_SIZE);
@@ -76,7 +79,7 @@ function buildExpectedBytes(): Uint8Array {
 
   // --- EventPayloads (0x01) ---
   putU8(0x01);
-  putU8(4); // 4 declared entries
+  putU8(5); // 5 declared entries
   putU8(0x02);
   putU16(164); // GameStart
   putU8(0x03);
@@ -85,6 +88,8 @@ function buildExpectedBytes(): Uint8Array {
   putU16(50); // PostFrameUpdate
   putU8(0x05);
   putU16(5); // GameEnd
+  putU8(0x06);
+  putU16(24); // ItemUpdate
 
   // --- GameStart (0x02) ---
   putU8(0x02);
@@ -256,6 +261,7 @@ const FIXTURE: SerializableReplay = {
           },
         },
       },
+      items: [],
     },
   ],
   gameEnd: { endReason: "normal", placements: [1, -1, -1, -1] },
@@ -268,8 +274,8 @@ describe("serializeReplay wire format", () => {
     expect(actual).toEqual(expected);
   });
 
-  it("produces exactly 334 bytes for the fixture (88 header + 14 + 165 + 10 + 51 + 6)", () => {
-    expect(serializeReplay(FIXTURE).byteLength).toBe(334);
+  it("produces exactly 337 bytes for the fixture (88 header + 17 + 165 + 10 + 51 + 6)", () => {
+    expect(serializeReplay(FIXTURE).byteLength).toBe(337);
   });
 
   it("writes the magic bytes at offset 0 and the version at offset 4", () => {

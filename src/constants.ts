@@ -28,6 +28,8 @@ export const EventCode = {
   PreFrameUpdate: 0x03,
   PostFrameUpdate: 0x04,
   GameEnd: 0x05,
+  /** Recorder schema v2+ only — see `docs/RMGR_SPEC.md` §4.6. */
+  ItemUpdate: 0x06,
 } as const;
 
 export type EventCode = (typeof EventCode)[keyof typeof EventCode];
@@ -44,6 +46,7 @@ export const EVENT_PAYLOAD_SIZES: Readonly<Record<EventCode, number>> = {
   [EventCode.PreFrameUpdate]: 9,
   [EventCode.PostFrameUpdate]: 50,
   [EventCode.GameEnd]: 5,
+  [EventCode.ItemUpdate]: 24,
 };
 
 /**

@@ -2,6 +2,7 @@ import type {
   Frame,
   GameEnd,
   GameStart,
+  ItemUpdate,
   PortIndex,
   PortSettings,
   SerializableReplay,
@@ -43,9 +44,24 @@ export function makeGameStart(overrides: Partial<GameStart> = {}): GameStart {
   };
 }
 
+export function makeItemUpdate(
+  overrides: Partial<ItemUpdate> = {},
+): ItemUpdate {
+  return {
+    frame: 0,
+    objectAddress: 0x80100000,
+    typeId: 0x00,
+    positionX: 0,
+    positionY: 0,
+    positionZ: 0,
+    ...overrides,
+  };
+}
+
 export function makeFrame(
   frameNumber: number,
   ports: readonly PortIndex[] = [0, 1],
+  items: readonly ItemUpdate[] = [],
 ): Frame {
   const entry: { -readonly [K in PortIndex]?: Frame["ports"][K] } = {};
   for (const port of ports) {
@@ -73,7 +89,7 @@ export function makeFrame(
       },
     };
   }
-  return { frame: frameNumber, ports: entry };
+  return { frame: frameNumber, ports: entry, items };
 }
 
 export function makeGameEnd(overrides: Partial<GameEnd> = {}): GameEnd {
