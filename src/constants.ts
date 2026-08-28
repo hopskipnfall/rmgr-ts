@@ -1,4 +1,9 @@
-import type { GameEndReason, HandicapMode, SlotType } from "./types.js";
+import type {
+  GameEndReason,
+  HandicapMode,
+  HitboxUpdate,
+  SlotType,
+} from "./types.js";
 
 /** ASCII magic bytes at offset 0x00 of every `.rmgr` file. */
 export const MAGIC = "RMGR";
@@ -28,8 +33,22 @@ export const EventCode = {
   PreFrameUpdate: 0x03,
   PostFrameUpdate: 0x04,
   GameEnd: 0x05,
-  /** Recorder schema v2+ only — see `docs/RMGR_SPEC.md` §4.6. */
+  /**
+   * Recorder schema v2+ — see `docs/RMGR_SPEC.md` §4.6. Schema v2's
+   * `typeId` field was wrong (not just incomplete); schema v3+ replaced it
+   * with `linkId`/`kind`, a different (larger) payload size — see
+   * `ItemUpdate`'s own doc comment in `types.ts`.
+   */
   ItemUpdate: 0x06,
+  /** Recorder schema v3+ only — see `docs/RMGR_SPEC.md` §4.7. */
+  StageHazardUpdate: 0x07,
+  /**
+   * Recorder schema v5+ only — see `docs/RMGR_SPEC.md` §4.8. Deliberately
+   * verbose/temporary; see `HitboxUpdate`'s own doc comment in `types.ts`.
+   */
+  HitboxUpdate: 0x08,
+  /** Recorder schema v5+ only, NOT sparse — see `docs/RMGR_SPEC.md` §4.9 and `HurtboxUpdate`'s own doc comment in `types.ts`. */
+  HurtboxUpdate: 0x09,
 } as const;
 
 export type EventCode = (typeof EventCode)[keyof typeof EventCode];
@@ -46,7 +65,10 @@ export const EVENT_PAYLOAD_SIZES: Readonly<Record<EventCode, number>> = {
   [EventCode.PreFrameUpdate]: 9,
   [EventCode.PostFrameUpdate]: 50,
   [EventCode.GameEnd]: 5,
-  [EventCode.ItemUpdate]: 24,
+  [EventCode.ItemUpdate]: 25,
+  [EventCode.StageHazardUpdate]: 5,
+  [EventCode.HitboxUpdate]: 55,
+  [EventCode.HurtboxUpdate]: 51,
 };
 
 /**
@@ -102,6 +124,18 @@ export function hasButton(buttons: number, bits: number): boolean {
   return (buttons & bits) === bits;
 }
 
+/** `StageHazardUpdate.hazardFlags` bits — see `docs/RMGR_SPEC.md` §7.7. */
+export const HazardFlag = {
+  WhispyBlowing: 0x01,
+} as const;
+
+export type HazardFlag = (typeof HazardFlag)[keyof typeof HazardFlag];
+
+/** `true` if every bit in `bits` is set in `hazardFlags`. */
+export function hasHazardFlag(hazardFlags: number, bits: number): boolean {
+  return (hazardFlags & bits) === bits;
+}
+
 const SLOT_TYPE_BY_WIRE: readonly SlotType[] = ["human", "cpu", "empty"];
 
 export function slotTypeFromWire(wire: number): SlotType {
@@ -126,6 +160,34 @@ export function gameEndReasonFromWire(wire: number): GameEndReason {
 
 export function gameEndReasonToWire(reason: GameEndReason): number {
   return reason === "normal" ? 1 : 0;
+}
+
+const HITBOX_OWNER_KIND_BY_WIRE: readonly HitboxUpdate["ownerKind"][] = [
+  "fighter",
+  "item",
+  "weapon",
+];
+
+export function hitboxOwnerKindFromWire(
+  wire: number,
+): HitboxUpdate["ownerKind"] {
+  const value = HITBOX_OWNER_KIND_BY_WIRE[wire];
+  if (value === undefined) {
+    throw new RangeError(`unknown HitboxUpdate.ownerKind wire value: ${wire}`);
+  }
+  return value;
+}
+
+export function hitboxOwnerKindToWire(
+  ownerKind: HitboxUpdate["ownerKind"],
+): number {
+  const wire = HITBOX_OWNER_KIND_BY_WIRE.indexOf(ownerKind);
+  if (wire === -1) {
+    throw new RangeError(
+      `unknown HitboxUpdate.ownerKind: ${String(ownerKind)}`,
+    );
+  }
+  return wire;
 }
 
 const HANDICAP_MODE_BY_WIRE: readonly HandicapMode[] = ["off", "on", "auto"];

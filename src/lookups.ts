@@ -1151,3 +1151,140 @@ export function getCharacterGroup(
 ): CharacterGroup {
   return getGameDefinitions(goodName).getCharacterGroup(id);
 }
+
+// ---------------------------------------------------------------------------
+// Item/Weapon kinds (docs/RMGR_SPEC.md section 7.6) - ItemUpdate.kind's
+// enum, selected by ItemUpdate.linkId. SmashRemix2.0.1-specific (this is
+// currently the only goodName the recorder ever emits ItemUpdate for), so
+// unlike the character/stage/action-state lookups above, these aren't
+// routed through GameDefinitions/getGameDefinitions.
+//
+// No Japanese names are provided - none are documented yet, and guessing
+// would be worse than just returning the English name for both languages.
+// ---------------------------------------------------------------------------
+
+/** `ItemUpdate.linkId` wire values. */
+export const ItemLinkId = {
+  Item: 4,
+  Weapon: 5,
+} as const;
+
+/**
+ * Free-flying character special-move projectiles (`ItemUpdate.linkId ==
+ * ItemLinkId.Weapon`). Confirmed against a real SSB64 decompilation
+ * (VetriTheRetri/ssb-decomp-re) - see docs/RMGR_SPEC.md section 7.6.
+ */
+export const WPKind = {
+  Fireball: 0x00,
+  Blaster: 0x01,
+  ChargeShot: 0x02,
+  SamusBomb: 0x03,
+  Cutter: 0x04,
+  EggThrow: 0x05,
+  YoshiStar: 0x06,
+  Boomerang: 0x07,
+  SpinAttack: 0x08,
+  ThunderJoltAir: 0x09,
+  ThunderJoltGround: 0x0a,
+  ThunderHead: 0x0b,
+  ThunderTrail: 0x0c,
+  PKFire: 0x0d,
+  PKThunderHead: 0x0e,
+  PKThunderTrail: 0x0f,
+  BulletNormal: 0x10,
+  BulletHard: 0x11,
+  ArwingLaser2D: 0x12,
+  ArwingLaser3D: 0x13,
+  LGunAmmo: 0x14,
+  FFlowerFlame: 0x15,
+  StarRodStar: 0x16,
+  // 0x17-0x1F: Pokémon/monster weapons, not individually enumerated.
+} as const;
+
+/**
+ * Thrown/spawned items, stage hazard objects, and some fighter-held things
+ * like Link's pulled bomb (`ItemUpdate.linkId == ItemLinkId.Item`). Two
+ * values (`Bomb`, `PKFirePillar`) are confirmed directly against the
+ * decomp; the rest is `Hazards.standard`/`stage`/`pokemon` from Smash
+ * Remix's own `src/Hazards.asm`, which the decomp cross-check confirms
+ * uses the same numbering. `Bumper`/`Chansey` legitimately appear twice at
+ * different values - that's the source enum's own structure, not a
+ * transcription error. See docs/RMGR_SPEC.md section 7.6.
+ */
+export const ITKind = {
+  Crate: 0x00,
+  Barrel: 0x01,
+  Capsule: 0x02,
+  Egg: 0x03,
+  MaximTomato: 0x04,
+  Heart: 0x05,
+  Star: 0x06,
+  BeamSword: 0x07,
+  HomeRunBat: 0x08,
+  Fan: 0x09,
+  StarRod: 0x0a,
+  RayGun: 0x0b,
+  FireFlower: 0x0c,
+  Hammer: 0x0d,
+  MotionSensorBomb: 0x0e,
+  BobOmb: 0x0f,
+  Bumper: 0x10,
+  GreenShell: 0x11,
+  RedShell: 0x12,
+  Pokeball: 0x13,
+  PKFirePillar: 0x14,
+  Bomb: 0x15,
+  PowBlock: 0x16,
+  StageBumper: 0x17,
+  PiranhaPlant: 0x18,
+  Target: 0x19,
+  RTTFBomb: 0x1a,
+  StageChansey: 0x1b,
+  Electrode: 0x1c,
+  Charmander: 0x1d,
+  Venusaur: 0x1e,
+  Porygon: 0x1f,
+  Onix: 0x20,
+  Snorlax: 0x21,
+  Goldeen: 0x22,
+  Meowth: 0x23,
+  Charizard: 0x24,
+  Beedrill: 0x25,
+  Blastoise: 0x26,
+  Chansey: 0x27,
+  Starmie: 0x28,
+  Hitmonlee: 0x29,
+  Koffing: 0x2a,
+  Clefairy: 0x2b,
+  Mew: 0x2c,
+  /** Custom, out-of-range - Bowser's Castle stadium bomb specifically. */
+  BowserBomb: 0x011a,
+} as const;
+
+const WP_KIND_NAMES: Readonly<Record<number, string>> = Object.fromEntries(
+  Object.entries(WPKind).map(([name, value]) => [value, name]),
+);
+const IT_KIND_NAMES: Readonly<Record<number, string>> = Object.fromEntries(
+  Object.entries(ITKind).map(([name, value]) => [value, name]),
+);
+
+/**
+ * Human-readable name for an `ItemUpdate`'s `(linkId, kind)` pair, e.g.
+ * `"Boomerang"` or `"Bomb"`. Falls back to a hex-labeled placeholder for a
+ * `kind` outside the confirmed ranges above (e.g. Remix's own mod-added
+ * weapon IDs past `0x1F`, or a Pokémon/monster weapon `0x17`-`0x1F` not
+ * individually named) - never throws.
+ *
+ * English only - unlike the character/stage/action-state lookups above, no
+ * Japanese names are documented yet for these, and guessing would be worse
+ * than not having a `lang` parameter at all.
+ */
+export function getItemKindName(linkId: number, kind: number): string {
+  if (linkId === ItemLinkId.Weapon) {
+    return WP_KIND_NAMES[kind] ?? `Weapon 0x${kind.toString(16)}`;
+  }
+  if (linkId === ItemLinkId.Item) {
+    return IT_KIND_NAMES[kind] ?? `Item 0x${kind.toString(16)}`;
+  }
+  return `Unknown (linkId 0x${linkId.toString(16)}, kind 0x${kind.toString(16)})`;
+}

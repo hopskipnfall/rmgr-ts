@@ -1,5 +1,6 @@
 import { BinaryReader } from "./binary.js";
 import {
+  EVENT_PAYLOAD_SIZES,
   EventCode,
   FORMAT_VERSION,
   GAME_START_APPENDED_SIZE,
@@ -10,6 +11,7 @@ import {
   POST_FRAME_APPENDED_SIZE,
   gameEndReasonFromWire,
   handicapModeFromWire,
+  hitboxOwnerKindFromWire,
   slotTypeFromWire,
 } from "./constants.js";
 import type {
@@ -18,6 +20,8 @@ import type {
   GameEnd,
   GameStart,
   HandicapMode,
+  HitboxUpdate,
+  HurtboxUpdate,
   ItemUpdate,
   PortIndex,
   PortSettings,
@@ -242,14 +246,28 @@ function parseGameEnd(reader: BinaryReader): GameEnd {
   return { endReason, placements };
 }
 
+/** Schema v2's `ItemUpdate` payload size - a single (wrongly-derived) `typeId: u32` field instead of v3's `linkId: u8` + `kind: i32`. See `ItemUpdate`'s doc comment in `types.ts`. */
+const ITEM_UPDATE_SCHEMA_V2_SIZE = 24;
+
 function parseItemUpdate(
   reader: BinaryReader,
   declaredSize: number,
 ): ItemUpdate {
+  if (declaredSize < EVENT_PAYLOAD_SIZES[EventCode.ItemUpdate]) {
+    const hint =
+      declaredSize === ITEM_UPDATE_SCHEMA_V2_SIZE
+        ? " (this looks like a recorder schema v2 file - its ItemUpdate.typeId was never meaningful; re-record instead of parsing it)"
+        : "";
+    throw new ReplayParseError(
+      `ItemUpdate declared size ${declaredSize} is smaller than this package's schema v3 shape (${EVENT_PAYLOAD_SIZES[EventCode.ItemUpdate]} bytes)${hint}`,
+    );
+  }
+
   const start = reader.position;
   const frame = reader.readI32();
   const objectAddress = reader.readU32();
-  const typeId = reader.readU32();
+  const linkId = reader.readU8();
+  const kind = reader.readI32();
   const positionX = reader.readF32();
   const positionY = reader.readF32();
   const positionZ = reader.readF32();
@@ -262,7 +280,123 @@ function parseItemUpdate(
     reader.skip(stillUnread);
   }
 
-  return { frame, objectAddress, typeId, positionX, positionY, positionZ };
+  return {
+    frame,
+    objectAddress,
+    linkId,
+    kind,
+    positionX,
+    positionY,
+    positionZ,
+  };
+}
+
+function parseStageHazardUpdate(
+  reader: BinaryReader,
+  declaredSize: number,
+): { frame: number; hazardFlags: number } {
+  const start = reader.position;
+  const frame = reader.readI32();
+  const hazardFlags = reader.readU8();
+
+  const stillUnread = declaredSize - (reader.position - start);
+  if (stillUnread > 0) {
+    reader.skip(stillUnread);
+  }
+
+  return { frame, hazardFlags };
+}
+
+function parseHitboxUpdate(
+  reader: BinaryReader,
+  declaredSize: number,
+): HitboxUpdate {
+  const start = reader.position;
+  const frame = reader.readI32();
+  const ownerKind = hitboxOwnerKindFromWire(reader.readU8());
+  const ownerId = reader.readU32();
+  const slotIndex = reader.readU8();
+  const attackState = reader.readU8();
+  const damage = reader.readI32();
+  const positionX = reader.readF32();
+  const positionY = reader.readF32();
+  const positionZ = reader.readF32();
+  const size = reader.readF32();
+  const angle = reader.readI32();
+  const knockbackScale = reader.readI32();
+  const knockbackWeight = reader.readI32();
+  const knockbackBase = reader.readI32();
+  const element = reader.readI32();
+  const shieldDamage = reader.readI32();
+
+  const stillUnread = declaredSize - (reader.position - start);
+  if (stillUnread > 0) {
+    reader.skip(stillUnread);
+  }
+
+  return {
+    frame,
+    ownerKind,
+    ownerId,
+    slotIndex,
+    attackState,
+    damage,
+    positionX,
+    positionY,
+    positionZ,
+    size,
+    angle,
+    knockbackScale,
+    knockbackWeight,
+    knockbackBase,
+    element,
+    shieldDamage,
+  };
+}
+
+function parseHurtboxUpdate(
+  reader: BinaryReader,
+  declaredSize: number,
+): HurtboxUpdate {
+  const start = reader.position;
+  const frame = reader.readI32();
+  const port = reader.readU8() as PortIndex;
+  const slotIndex = reader.readU8();
+  const hitStatus = reader.readI32();
+  const placement = reader.readI32();
+  const isGrabbable = reader.readU8() !== 0;
+  const positionX = reader.readF32();
+  const positionY = reader.readF32();
+  const positionZ = reader.readF32();
+  const offsetX = reader.readF32();
+  const offsetY = reader.readF32();
+  const offsetZ = reader.readF32();
+  const sizeX = reader.readF32();
+  const sizeY = reader.readF32();
+  const sizeZ = reader.readF32();
+
+  const stillUnread = declaredSize - (reader.position - start);
+  if (stillUnread > 0) {
+    reader.skip(stillUnread);
+  }
+
+  return {
+    frame,
+    port,
+    slotIndex,
+    hitStatus,
+    placement,
+    isGrabbable,
+    positionX,
+    positionY,
+    positionZ,
+    offsetX,
+    offsetY,
+    offsetZ,
+    sizeX,
+    sizeY,
+    sizeZ,
+  };
 }
 
 interface MutableFrameEntry {
@@ -305,6 +439,9 @@ export function parseReplay(data: Uint8Array): Replay {
   let gameEnd: GameEnd | null = null;
   const frameEntries = new Map<number, Map<PortIndex, MutableFrameEntry>>();
   const itemsByFrame = new Map<number, ItemUpdate[]>();
+  const hazardFlagsByFrame = new Map<number, number>();
+  const hitboxesByFrame = new Map<number, HitboxUpdate[]>();
+  const hurtboxesByFrame = new Map<number, HurtboxUpdate[]>();
 
   const entryFor = (
     frameNumber: number,
@@ -376,6 +513,51 @@ export function parseReplay(data: Uint8Array): Replay {
         items.push(item);
         break;
       }
+      case EventCode.StageHazardUpdate: {
+        const declaredHazardSize = declaredSizes.get(
+          EventCode.StageHazardUpdate,
+        );
+        if (declaredHazardSize === undefined) {
+          throw new ReplayParseError(
+            "EventPayloads doesn't declare a size for StageHazardUpdate",
+          );
+        }
+        const hazard = parseStageHazardUpdate(reader, declaredHazardSize);
+        hazardFlagsByFrame.set(hazard.frame, hazard.hazardFlags);
+        break;
+      }
+      case EventCode.HitboxUpdate: {
+        const declaredHitboxSize = declaredSizes.get(EventCode.HitboxUpdate);
+        if (declaredHitboxSize === undefined) {
+          throw new ReplayParseError(
+            "EventPayloads doesn't declare a size for HitboxUpdate",
+          );
+        }
+        const hitbox = parseHitboxUpdate(reader, declaredHitboxSize);
+        let hitboxes = hitboxesByFrame.get(hitbox.frame);
+        if (!hitboxes) {
+          hitboxes = [];
+          hitboxesByFrame.set(hitbox.frame, hitboxes);
+        }
+        hitboxes.push(hitbox);
+        break;
+      }
+      case EventCode.HurtboxUpdate: {
+        const declaredHurtboxSize = declaredSizes.get(EventCode.HurtboxUpdate);
+        if (declaredHurtboxSize === undefined) {
+          throw new ReplayParseError(
+            "EventPayloads doesn't declare a size for HurtboxUpdate",
+          );
+        }
+        const hurtbox = parseHurtboxUpdate(reader, declaredHurtboxSize);
+        let hurtboxes = hurtboxesByFrame.get(hurtbox.frame);
+        if (!hurtboxes) {
+          hurtboxes = [];
+          hurtboxesByFrame.set(hurtbox.frame, hurtboxes);
+        }
+        hurtboxes.push(hurtbox);
+        break;
+      }
       default: {
         const size = declaredSizes.get(code);
         if (size === undefined) {
@@ -393,12 +575,19 @@ export function parseReplay(data: Uint8Array): Replay {
     throw new ReplayParseError("file has no GameStart event");
   }
 
-  // Union, not just frameEntries' keys: an ItemUpdate could in principle
-  // land on a frame with no seated-port pre/post pair recorded (e.g. every
-  // port momentarily failing the recorder's own validity check) - rare, but
-  // an item shouldn't silently vanish if it does happen.
+  // Union, not just frameEntries' keys: an ItemUpdate/StageHazardUpdate/
+  // HitboxUpdate/HurtboxUpdate could in principle land on a frame with no
+  // seated-port pre/post pair recorded (e.g. every port momentarily failing
+  // the recorder's own validity check) - rare, but shouldn't silently
+  // vanish if it happens.
   const frameNumbers = [
-    ...new Set([...frameEntries.keys(), ...itemsByFrame.keys()]),
+    ...new Set([
+      ...frameEntries.keys(),
+      ...itemsByFrame.keys(),
+      ...hazardFlagsByFrame.keys(),
+      ...hitboxesByFrame.keys(),
+      ...hurtboxesByFrame.keys(),
+    ]),
   ].sort((a, b) => a - b);
   const frames: Frame[] = frameNumbers.map((frameNumber) => {
     const portEntries = frameEntries.get(frameNumber);
@@ -415,7 +604,17 @@ export function parseReplay(data: Uint8Array): Replay {
       }
     }
     const items = itemsByFrame.get(frameNumber) ?? [];
-    return { frame: frameNumber, ports, items };
+    const hazardFlags = hazardFlagsByFrame.get(frameNumber) ?? 0;
+    const hitboxes = hitboxesByFrame.get(frameNumber) ?? [];
+    const hurtboxes = hurtboxesByFrame.get(frameNumber) ?? [];
+    return {
+      frame: frameNumber,
+      ports,
+      items,
+      hazardFlags,
+      hitboxes,
+      hurtboxes,
+    };
   });
 
   return {

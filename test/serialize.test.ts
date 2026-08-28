@@ -19,14 +19,16 @@ const FIXTURE_RECORDED_AT_EPOCH_SECONDS = 1_766_000_000;
  */
 function buildExpectedBytes(): Uint8Array {
   const EVENT_STREAM_SIZE =
-    17 /* EventPayloads (5 declared entries: 1 + 5*3) */ +
+    26 /* EventPayloads: code(1) + count(1) + 8 entries * 3 bytes each (24) */ +
     (1 + 164) /* GameStart */ +
     (1 + 9) /* PreFrame */ +
     (1 + 50) /* PostFrame */ +
     (1 + 5); /* GameEnd */
-  // No ItemUpdate events themselves - the fixture frame has no items - only
-  // EventPayloads' declared entry for it (schema v2's writer always
-  // declares it, even for a match with no items ever recorded).
+  // No ItemUpdate/StageHazardUpdate/HitboxUpdate/HurtboxUpdate events
+  // themselves - the fixture frame has no items, hazardFlags is 0, and no
+  // hitboxes/hurtboxes - only EventPayloads' declared entry for each (this
+  // package's writer always declares every event type it ever emits, even
+  // for a match with none of that type ever recorded).
   const TOTAL_SIZE = HEADER_SIZE /* header */ + EVENT_STREAM_SIZE;
 
   const buf = new ArrayBuffer(TOTAL_SIZE);
@@ -79,7 +81,7 @@ function buildExpectedBytes(): Uint8Array {
 
   // --- EventPayloads (0x01) ---
   putU8(0x01);
-  putU8(5); // 5 declared entries
+  putU8(8); // 8 declared entries
   putU8(0x02);
   putU16(164); // GameStart
   putU8(0x03);
@@ -89,7 +91,13 @@ function buildExpectedBytes(): Uint8Array {
   putU8(0x05);
   putU16(5); // GameEnd
   putU8(0x06);
-  putU16(24); // ItemUpdate
+  putU16(25); // ItemUpdate
+  putU8(0x07);
+  putU16(5); // StageHazardUpdate
+  putU8(0x08);
+  putU16(55); // HitboxUpdate
+  putU8(0x09);
+  putU16(51); // HurtboxUpdate
 
   // --- GameStart (0x02) ---
   putU8(0x02);
@@ -274,8 +282,8 @@ describe("serializeReplay wire format", () => {
     expect(actual).toEqual(expected);
   });
 
-  it("produces exactly 337 bytes for the fixture (88 header + 17 + 165 + 10 + 51 + 6)", () => {
-    expect(serializeReplay(FIXTURE).byteLength).toBe(337);
+  it("produces exactly 346 bytes for the fixture (88 header + 26 + 165 + 10 + 51 + 6)", () => {
+    expect(serializeReplay(FIXTURE).byteLength).toBe(346);
   });
 
   it("writes the magic bytes at offset 0 and the version at offset 4", () => {
