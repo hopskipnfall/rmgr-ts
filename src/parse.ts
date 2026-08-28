@@ -5,8 +5,8 @@ import {
   FORMAT_VERSION,
   GAME_START_APPENDED_SIZE,
   GOOD_NAME_WIDTH,
-  HEADER_SIZE,
   MAGIC,
+  MIN_READABLE_FORMAT_VERSION,
   PLAYER_NAME_WIDTH,
   POST_FRAME_APPENDED_SIZE,
   gameEndReasonFromWire,
@@ -52,18 +52,34 @@ function parseHeader(reader: BinaryReader): ReplayHeader {
     );
   }
   const version = reader.readU8();
-  if (version !== FORMAT_VERSION) {
+  if (version < MIN_READABLE_FORMAT_VERSION || version > FORMAT_VERSION) {
     throw new ReplayParseError(
-      `unsupported format version ${version} - this package only reads version ${FORMAT_VERSION} ` +
-        `(the header layout itself changed between versions, so this isn't just a missing-field situation)`,
+      `unsupported format version ${version} - this package only reads versions ` +
+        `${MIN_READABLE_FORMAT_VERSION}-${FORMAT_VERSION} (the header layout itself changed ` +
+        `between some of these, so this isn't just a missing-field situation)`,
     );
   }
   reader.skip(3); // reserved
   const streamLength = reader.readU32();
   const goodName = reader.readFixedUtf8String(GOOD_NAME_WIDTH);
   const recorderSchemaVersion = reader.readU32();
-  const recordedAtEpochMillis = reader.readU64();
-  const recordedAtNanosOffset = reader.readU32();
+
+  // Version 3's header ended with recordedAtEpochSeconds (u64, whole
+  // seconds) instead of v4's recordedAtEpochMillis + recordedAtNanosOffset -
+  // see MIN_READABLE_FORMAT_VERSION's doc comment. Synthesizing the v4
+  // shape here means every other consumer in this package (and downstream
+  // ones like rmgr-viewer) only ever has to deal with millis.
+  let recordedAtEpochMillis: number;
+  let recordedAtNanosOffset: number;
+  if (version <= 3) {
+    const recordedAtEpochSeconds = reader.readU64();
+    recordedAtEpochMillis = recordedAtEpochSeconds * 1000;
+    recordedAtNanosOffset = 0;
+  } else {
+    recordedAtEpochMillis = reader.readU64();
+    recordedAtNanosOffset = reader.readU32();
+  }
+
   return {
     version,
     streamLength,
@@ -422,10 +438,14 @@ interface MutableFrameEntry {
 export function parseReplay(data: Uint8Array): Replay {
   const reader = new BinaryReader(data);
   const header = parseHeader(reader);
+  // reader.position, not the HEADER_SIZE constant: a version-3 file's
+  // header is 4 bytes narrower (see MIN_READABLE_FORMAT_VERSION), and
+  // streamLength is measured from wherever *that* file's own header ends.
+  const headerSize = reader.position;
 
   const streamEnd =
     header.streamLength > 0
-      ? HEADER_SIZE + header.streamLength
+      ? headerSize + header.streamLength
       : data.byteLength;
 
   const firstCode = reader.readU8();

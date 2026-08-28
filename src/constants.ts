@@ -9,18 +9,37 @@ import type {
 export const MAGIC = "RMGR";
 
 /**
- * The only format version this package currently reads and writes. Bumped
- * 1 -> 2 to add `goodName`/`recorderSchemaVersion`, then 2 -> 3 to add
+ * The only format version `serializeReplay` writes. Bumped 1 -> 2 to add
+ * `goodName`/`recorderSchemaVersion`, then 2 -> 3 to add
  * `recordedAtEpochSeconds`, then 3 -> 4 to replace that with
  * `recordedAtEpochMillis` + `recordedAtNanosOffset` (docs/RMGR_SPEC.md
  * §3.1/§5) - each a deliberate breaking change to the header layout itself,
  * not something the field-append/new-event mechanisms (§5) could cover.
- * Files predating version 4 aren't expected to parse under this version of
- * the package.
+ *
+ * `parseReplay` reads this version plus everything back to
+ * `MIN_READABLE_FORMAT_VERSION` - see that constant's own doc comment for
+ * why version 3 specifically gets read-compat instead of the usual hard
+ * cutover.
  */
 export const FORMAT_VERSION = 4;
 
-/** Fixed size of the file header, in bytes. */
+/**
+ * Oldest format version `parseReplay` still reads. Deliberately looser than
+ * `FORMAT_VERSION`'s own hard-cutover history (§5) would otherwise suggest:
+ * existing `.rmgr` files and the demo replays bundled with rmgr-viewer
+ * predate the 3 -> 4 bump, and unlike the 1 -> 2 -> 3 jumps, this one has
+ * no genuinely new information to recover from an old file - `recordedAt-
+ * EpochMillis` is trivially derivable from v3's `recordedAtEpochSeconds` by
+ * multiplying by 1000 (`recordedAtNanosOffset` becomes `0`, since that
+ * precision genuinely doesn't exist in a v3 file). `serializeReplay` never
+ * writes anything below `FORMAT_VERSION` - this only affects reading.
+ * Versions 1 and 2 remain unreadable; their header layouts are missing
+ * fields entirely, not just narrower ones, so there's nothing valid to
+ * synthesize.
+ */
+export const MIN_READABLE_FORMAT_VERSION = 3;
+
+/** Fixed size of the current (`FORMAT_VERSION`) file header, in bytes. A version-3 file's header is 4 bytes narrower - see `MIN_READABLE_FORMAT_VERSION`. */
 export const HEADER_SIZE = 92;
 
 /** Fixed width of the header's `goodName` field, in bytes. */
