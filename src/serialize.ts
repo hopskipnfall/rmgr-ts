@@ -108,7 +108,7 @@ function writePostFrame(w: BinaryWriter, post: PostFrameUpdate): void {
   w.writeF32(post.velocityY);
   w.writeU32(post.damagePercent);
   w.writeI8(post.stocksRemaining);
-  w.writeU8(post.jumpsUsed);
+  w.writeU8(post.jumpsRemaining);
   w.writeU8(post.grounded ? 0 : 1);
   w.writeU8(post.hurtboxState);
   w.writeU16(post.hitstunCounter);

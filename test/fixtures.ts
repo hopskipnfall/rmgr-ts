@@ -132,7 +132,7 @@ export function makeFrame(
         velocityY: 0,
         damagePercent: 0,
         stocksRemaining: 2,
-        jumpsUsed: 0,
+        jumpsRemaining: 0,
         grounded: true,
         hurtboxState: 0,
         hitstunCounter: 0,

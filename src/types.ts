@@ -110,7 +110,17 @@ export interface PostFrameUpdate {
   readonly damagePercent: number;
   /** 0-based; negative once eliminated. */
   readonly stocksRemaining: number;
-  readonly jumpsUsed: number;
+  /**
+   * `jumpsMax` (per-character) minus the fighter's used-jump counter.
+   * Named/interpreted as `jumpsUsed` through schema v6 - that read a
+   * constant `0` for an entire match, every port, regardless of real jump
+   * activity (a wrong-width memory read on RMG-K's side - see
+   * `docs/RMGR_SPEC.md` §5's v6→v7 note). Schema v6 and earlier files'
+   * byte here is meaningless, not real data. `0` through most of a
+   * grounded match is normal even in a correct v7+ file (jumps reset to 0
+   * on landing) - it isn't itself a sign of the old bug.
+   */
+  readonly jumpsRemaining: number;
   readonly grounded: boolean;
   /** `0x03` = intangible/invincible. See `docs/RMGR_SPEC.md` §4.4. */
   readonly hurtboxState: number;

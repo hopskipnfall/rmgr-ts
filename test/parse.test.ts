@@ -139,7 +139,7 @@ describe("parseReplay error handling", () => {
     w.writeF32(0); // velocityY
     w.writeU32(0); // damagePercent
     w.writeI8(2); // stocksRemaining
-    w.writeU8(0); // jumpsUsed
+    w.writeU8(0); // jumpsRemaining
     w.writeU8(0); // groundedState
     w.writeU8(0); // hurtboxState
     w.writeU16(0); // hitstunCounter
