@@ -166,7 +166,7 @@ function buildExpectedBytes(): Uint8Array {
   putF32(-0.5); // velocityY
   putU32(42); // damagePercent
   putI8(2); // stocksRemaining
-  putU8(1); // jumpsUsed
+  putU8(1); // jumpsRemaining
   putU8(0); // groundedState (0 = grounded)
   putU8(0); // hurtboxState
   putU16(0); // hitstunCounter
@@ -259,7 +259,7 @@ const FIXTURE: SerializableReplay = {
             velocityY: -0.5,
             damagePercent: 42,
             stocksRemaining: 2,
-            jumpsUsed: 1,
+            jumpsRemaining: 1,
             grounded: true,
             hurtboxState: 0,
             hitstunCounter: 0,

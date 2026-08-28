@@ -197,7 +197,7 @@ function parsePostFrame(
   const velocityY = reader.readF32();
   const damagePercent = reader.readU32();
   const stocksRemaining = reader.readI8();
-  const jumpsUsed = reader.readU8();
+  const jumpsRemaining = reader.readU8();
   const grounded = reader.readU8() === 0;
   const hurtboxState = reader.readU8();
   const hitstunCounter = reader.readU16();
@@ -230,7 +230,7 @@ function parsePostFrame(
     velocityY,
     damagePercent,
     stocksRemaining,
-    jumpsUsed,
+    jumpsRemaining,
     grounded,
     hurtboxState,
     hitstunCounter,
