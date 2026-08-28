@@ -34,12 +34,40 @@ function buildRawFile(
   return result;
 }
 
+/** Same as buildRawFile, but with a version-3-shaped header (88 bytes, ending in recordedAtEpochSeconds instead of v4's recordedAtEpochMillis + recordedAtNanosOffset) - for exercising parseHeader's read-compat branch. */
+function buildRawV3File(
+  streamLength: number,
+  eventBytes: Uint8Array,
+  recordedAtEpochSeconds: number,
+): Uint8Array {
+  const header = new BinaryWriter();
+  header.writeBytes(new TextEncoder().encode(MAGIC));
+  header.writeU8(3);
+  header.writeBytes(new Uint8Array(3));
+  header.writeU32(streamLength);
+  header.writeFixedString("SmashRemix2.0.1", GOOD_NAME_WIDTH);
+  header.writeU32(1);
+  header.writeU64(recordedAtEpochSeconds);
+  const headerBytes = header.toUint8Array();
+  const result = new Uint8Array(headerBytes.byteLength + eventBytes.byteLength);
+  result.set(headerBytes, 0);
+  result.set(eventBytes, headerBytes.byteLength);
+  return result;
+}
+
 describe("parseReplay error handling", () => {
   it("rejects a file with the wrong magic bytes", () => {
     const bytes = serializeReplay(makeReplay());
     bytes.set(new TextEncoder().encode("XXXX"), 0);
     expect(() => parseReplay(bytes)).toThrow(ReplayParseError);
     expect(() => parseReplay(bytes)).toThrow(/magic/i);
+  });
+
+  it("rejects a version-2 file (older than MIN_READABLE_FORMAT_VERSION)", () => {
+    const bytes = serializeReplay(makeReplay());
+    bytes[4] = 2; // version byte
+    expect(() => parseReplay(bytes)).toThrow(ReplayParseError);
+    expect(() => parseReplay(bytes)).toThrow(/unsupported format version 2/);
   });
 
   it("rejects a file whose first event isn't EventPayloads", () => {
@@ -105,6 +133,25 @@ describe("parseReplay error handling", () => {
     expect(parsed.isComplete).toBe(false);
     expect(parsed.frames).toHaveLength(2);
     void eventStream; // unused, kept for symmetry with other tests' structure
+  });
+
+  it("reads a version-3 file, synthesizing recordedAtEpochMillis/recordedAtNanosOffset from its recordedAtEpochSeconds", () => {
+    const full = serializeReplay(makeReplay({ frames: [], gameEnd: null }));
+    // Version 3's header is 88 bytes, 4 narrower than v4's 92 - the event
+    // stream bytes themselves don't depend on header version at all, so
+    // the v4 fixture's event stream is exactly what a v3 file's would be.
+    const eventBytes = full.subarray(HEADER_SIZE);
+    const bytes = buildRawV3File(
+      eventBytes.byteLength,
+      eventBytes,
+      1_700_000_000,
+    );
+
+    const parsed = parseReplay(bytes);
+    expect(parsed.header.version).toBe(3);
+    expect(parsed.header.recordedAtEpochMillis).toBe(1_700_000_000_000);
+    expect(parsed.header.recordedAtNanosOffset).toBe(0);
+    expect(parsed.gameStart.stageId).toBe(0x10); // confirms the event stream itself parsed correctly, at the right offset
   });
 
   it("throws when a frame+port has a PostFrameUpdate with no matching PreFrameUpdate", () => {
