@@ -244,7 +244,8 @@ export function serializeReplay(replay: SerializableReplay): Uint8Array {
   header.writeU32(eventBytes.byteLength);
   header.writeFixedString(replay.goodName, GOOD_NAME_WIDTH);
   header.writeU32(replay.recorderSchemaVersion);
-  header.writeU64(replay.recordedAtEpochSeconds);
+  header.writeU64(replay.recordedAtEpochMillis);
+  header.writeU32(replay.recordedAtNanosOffset ?? 0);
   const headerBytes = header.toUint8Array();
 
   const result = new Uint8Array(headerBytes.byteLength + eventBytes.byteLength);

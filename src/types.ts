@@ -348,11 +348,21 @@ export interface ReplayHeader {
    */
   readonly recorderSchemaVersion: number;
   /**
-   * Wall-clock time the recording started, seconds since the Unix epoch
-   * (UTC) - independent of the filename's own timestamp (docs/RMGR_SPEC.md
-   * §3.4), though the recorder writes the same instant to both.
+   * Wall-clock time the recording started, milliseconds since the Unix
+   * epoch (UTC) - independent of the filename's own timestamp
+   * (docs/RMGR_SPEC.md §3.4), though the recorder writes the same instant
+   * to both (truncated to whole seconds there).
    */
-  readonly recordedAtEpochSeconds: number;
+  readonly recordedAtEpochMillis: number;
+  /**
+   * Nanosecond offset within `recordedAtEpochMillis`'s millisecond, for
+   * finer-than-millisecond alignment across multiple recordings from the
+   * same session. Range 0-999999. Best-effort - `0` means either exactly on
+   * the millisecond boundary or, more commonly, that the recorder had no
+   * sub-millisecond precision to offer for this particular file (see
+   * docs/RMGR_SPEC.md §3.1/§3.4).
+   */
+  readonly recordedAtNanosOffset: number;
 }
 
 /** A fully parsed `.rmgr` file. */
@@ -381,8 +391,10 @@ export interface SerializableReplay {
   readonly goodName: string;
   /** See `ReplayHeader.recorderSchemaVersion`. */
   readonly recorderSchemaVersion: number;
-  /** See `ReplayHeader.recordedAtEpochSeconds`. */
-  readonly recordedAtEpochSeconds: number;
+  /** See `ReplayHeader.recordedAtEpochMillis`. */
+  readonly recordedAtEpochMillis: number;
+  /** See `ReplayHeader.recordedAtNanosOffset`. Optional - defaults to `0`. */
+  readonly recordedAtNanosOffset?: number;
   readonly gameStart: GameStart;
   readonly frames: readonly Frame[];
   /** Omit or pass `null` to write a file with no `GameEnd` event. */

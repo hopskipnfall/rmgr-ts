@@ -5,7 +5,8 @@ import type { SerializableReplay } from "../src/types.js";
 
 const FIXTURE_GOOD_NAME = "SmashRemix2.0.1";
 const FIXTURE_RECORDER_SCHEMA_VERSION = 1;
-const FIXTURE_RECORDED_AT_EPOCH_SECONDS = 1_766_000_000;
+const FIXTURE_RECORDED_AT_EPOCH_MILLIS = 1_766_000_000_000;
+const FIXTURE_RECORDED_AT_NANOS_OFFSET = 123_456;
 
 /**
  * Independently builds the exact bytes `docs/RMGR_SPEC.md` specifies for a
@@ -72,12 +73,13 @@ function buildExpectedBytes(): Uint8Array {
 
   // --- File header ---
   putAscii("RMGR", 4);
-  putU8(3); // version
+  putU8(4); // version
   o += 3; // reserved, already zero
   putU32(EVENT_STREAM_SIZE); // streamLength
   putAscii(FIXTURE_GOOD_NAME, GOOD_NAME_WIDTH);
   putU32(FIXTURE_RECORDER_SCHEMA_VERSION);
-  putU64(FIXTURE_RECORDED_AT_EPOCH_SECONDS);
+  putU64(FIXTURE_RECORDED_AT_EPOCH_MILLIS);
+  putU32(FIXTURE_RECORDED_AT_NANOS_OFFSET);
 
   // --- EventPayloads (0x01) ---
   putU8(0x01);
@@ -191,7 +193,8 @@ function buildExpectedBytes(): Uint8Array {
 const FIXTURE: SerializableReplay = {
   goodName: FIXTURE_GOOD_NAME,
   recorderSchemaVersion: FIXTURE_RECORDER_SCHEMA_VERSION,
-  recordedAtEpochSeconds: FIXTURE_RECORDED_AT_EPOCH_SECONDS,
+  recordedAtEpochMillis: FIXTURE_RECORDED_AT_EPOCH_MILLIS,
+  recordedAtNanosOffset: FIXTURE_RECORDED_AT_NANOS_OFFSET,
   gameStart: {
     stageId: 0x10,
     gameType: 2,
@@ -282,14 +285,14 @@ describe("serializeReplay wire format", () => {
     expect(actual).toEqual(expected);
   });
 
-  it("produces exactly 346 bytes for the fixture (88 header + 26 + 165 + 10 + 51 + 6)", () => {
-    expect(serializeReplay(FIXTURE).byteLength).toBe(346);
+  it("produces exactly 350 bytes for the fixture (92 header + 26 + 165 + 10 + 51 + 6)", () => {
+    expect(serializeReplay(FIXTURE).byteLength).toBe(350);
   });
 
   it("writes the magic bytes at offset 0 and the version at offset 4", () => {
     const bytes = serializeReplay(FIXTURE);
     expect(new TextDecoder("ascii").decode(bytes.subarray(0, 4))).toBe("RMGR");
-    expect(bytes[4]).toBe(3);
+    expect(bytes[4]).toBe(4);
   });
 
   it("writes streamLength as the byte count after the header", () => {
