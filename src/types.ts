@@ -140,13 +140,20 @@ export interface FramePortData {
 }
 
 /**
- * One live object on the shared item/hazard/projectile list, for a single
- * frame — see `docs/RMGR_SPEC.md` §4.6. Covers everything on that list, not
- * just character-special-move projectiles: spawned items and stage hazard
- * objects (thrown bananas, Poké Balls, Waddle Dees, ...) share the same
- * list and currently can't be told apart from a projectile by `typeId`
- * alone. Absent (empty `Frame.items`) in a file recorded before schema v2 —
- * see `ReplayHeader.recorderSchemaVersion`.
+ * One live Item or Weapon object on the shared `GObj` list, for a single
+ * frame — see `docs/RMGR_SPEC.md` §4.6. "Weapon" is a free-flying character
+ * special-move projectile (boomerang, fireball, ...); "Item" covers
+ * thrown/spawned items and hazard objects, including some fighter-held
+ * things like Link's pulled bomb. Absent (empty `Frame.items`) in a file
+ * recorded before schema v2 — see `ReplayHeader.recorderSchemaVersion`.
+ *
+ * **Schema v2 files' `ItemUpdate` data is not usable** — that schema had a
+ * single `typeId` field read from the wrong offset, producing a large,
+ * meaningless, constantly-changing value instead of a real type. Schema v3
+ * replaced it with `linkId`/`kind` below. This package only parses/writes
+ * the v3 shape; `parseReplay` throws on an older `ItemUpdate` payload size
+ * rather than silently returning garbage - see `docs/RMGR_SPEC.md` §5's
+ * recorder schema history for the full story.
  */
 export interface ItemUpdate {
   readonly frame: number;
@@ -159,21 +166,116 @@ export interface ItemUpdate {
    * frames are the same object.
    */
   readonly objectAddress: number;
+  /** `4` = Item, `5` = Weapon — which enum `kind` is a value from. See `ItemLinkId` in `lookups.ts` and `docs/RMGR_SPEC.md` §7.6. */
+  readonly linkId: number;
   /**
-   * Raw value read from the object. `0x00`-`0x1F` is the vanilla
-   * item/projectile ID range, `0x20`+ is Remix-added — see
-   * `docs/RMGR_SPEC.md` §7.6. **There is currently no name lookup table for
-   * these IDs** — this is a bare number, not `"boomerang"` or `"bomb"`.
+   * `ITKind` (`linkId === 4`) or `WPKind` (`linkId === 5`) — the real,
+   * named per-instance type. See `getItemKindName()` in `lookups.ts` to
+   * resolve this to a display string, and `docs/RMGR_SPEC.md` §7.6 for both
+   * enums.
    */
-  readonly typeId: number;
+  readonly kind: number;
   readonly positionX: number;
   readonly positionY: number;
-  /**
-   * Read using the same object→topjoint indirection as X/Y, but *not*
-   * independently confirmed to be correct for this specific field — see
-   * `docs/RMGR_SPEC.md` §4.6. Treat with more skepticism than X/Y.
-   */
+  /** Confirmed exactly against a real SSB64 decompilation — see `docs/RMGR_SPEC.md` §4.6. */
   readonly positionZ: number;
+}
+
+/**
+ * One currently-active hitbox slot for a single frame — a fighter's own
+ * attack (`FTAttackColl`, 4 slots/fighter) or an item's/weapon's attack
+ * (`ITAttackColl`/`WPAttackColl`, 2 slots each). Absent (empty
+ * `Frame.hitboxes`) in a file recorded before schema v5. See
+ * `docs/RMGR_SPEC.md` §4.8.
+ *
+ * Deliberately verbose and temporary: recorded for every active slot, every
+ * frame, with no deduplication against action state — the plan is to keep
+ * doing that only until it's confirmed that a character's hitbox geometry
+ * is reliably derivable from `(characterId, actionStateId,
+ * actionFrameCounter)` alone, at which point recording can stop for that
+ * character. See `docs/RMGR_SPEC.md` §8.
+ *
+ * **Confidence caveat:** `ownerKind === "fighter"` fields are high
+ * confidence (confirmed via real Remix ASM call sites and the decomp,
+ * agreeing exactly). `"item"`/`"weapon"` fields have high-confidence field
+ * *order* but hand-derived, not compiler-verified, byte *offsets* — see
+ * `docs/RMGR_SPEC.md` §4.8's own caveat.
+ */
+export interface HitboxUpdate {
+  readonly frame: number;
+  /** Which struct this came from, and how `ownerId` below is interpreted. */
+  readonly ownerKind: "fighter" | "item" | "weapon";
+  /**
+   * `ownerKind === "fighter"`: the port (0-3). Otherwise: the owning
+   * `GObj`'s own RDRAM address — the same identity as
+   * `ItemUpdate.objectAddress`, so a `HitboxUpdate` can be correlated to
+   * that frame's `ItemUpdate` for the same live object.
+   */
+  readonly ownerId: number;
+  /** Fighter: 0-3. Item/Weapon: 0-1. */
+  readonly slotIndex: number;
+  /** `1` = fresh (became active this frame), `2` = transfer, `3` = interpolate. Never `0` — a disabled slot is never returned. */
+  readonly attackState: number;
+  readonly damage: number;
+  /** World-space, already transformed. */
+  readonly positionX: number;
+  readonly positionY: number;
+  readonly positionZ: number;
+  /** Radius — hitboxes are spheres, not boxes. */
+  readonly size: number;
+  /** Knockback angle. */
+  readonly angle: number;
+  readonly knockbackScale: number;
+  readonly knockbackWeight: number;
+  readonly knockbackBase: number;
+  readonly element: number;
+  readonly shieldDamage: number;
+}
+
+/**
+ * One hurtbox slot on a fighter's body for a single frame (`FTDamageColl`,
+ * 11 slots/fighter, one per body region). Fighter-only — items/weapons have
+ * at most a single *static*, per-type hurtbox template with no live
+ * per-instance data traced yet. Absent (empty `Frame.hurtboxes`) in a file
+ * recorded before schema v5. See `docs/RMGR_SPEC.md` §4.9.
+ *
+ * **Unlike `HitboxUpdate`/`ItemUpdate`, this is NOT sparse** — a seated
+ * port's 11 slots are (almost) always all present every frame, since
+ * hurtboxes exist essentially continuously while a fighter is alive.
+ * Same "deliberately verbose and temporary" rationale as `HitboxUpdate` —
+ * see its doc comment and `docs/RMGR_SPEC.md` §8.
+ */
+export interface HurtboxUpdate {
+  readonly frame: number;
+  readonly port: PortIndex;
+  /** 0-10. */
+  readonly slotIndex: number;
+  /**
+   * Per-bone Vulnerable/Invincible/Intangible. Raw value — the exact
+   * numeric mapping for this *per-bone* field isn't independently confirmed
+   * the way the whole-character convention is
+   * (`PostFrameUpdate.hurtboxState`, `3` = intangible).
+   */
+  readonly hitStatus: number;
+  /** `0` = low, `1` = middle, `2` = high. */
+  readonly placement: number;
+  readonly isGrabbable: boolean;
+  /**
+   * **Approximation, not the true hurtbox center** — the bone's own
+   * world-space joint position. Does NOT apply `offsetX/Y/Z` below or the
+   * bone's rotation on top.
+   */
+  readonly positionX: number;
+  readonly positionY: number;
+  readonly positionZ: number;
+  /** Authored, bone-relative, untransformed. */
+  readonly offsetX: number;
+  readonly offsetY: number;
+  readonly offsetZ: number;
+  /** Anisotropic — unlike a hitbox's single `size` radius. */
+  readonly sizeX: number;
+  readonly sizeY: number;
+  readonly sizeZ: number;
 }
 
 /**
@@ -181,15 +283,26 @@ export interface ItemUpdate {
  * and live that frame — never assume all four are present. `items` is
  * every `ItemUpdate` recorded for this frame, in the order they appeared in
  * the file. `parseReplay` always returns an array here (empty if nothing
- * was live on the item/hazard/projectile list that frame, or if this file
- * predates recorder schema v2) — declared optional only so code that
- * hand-constructs a `Frame` (tests, older callers) isn't forced to specify
- * it; treat a missing `items` the same as an empty array.
+ * was live that frame, or if this file predates recorder schema v3 - see
+ * `ItemUpdate`'s own doc comment for why schema v2 doesn't count) —
+ * declared optional only so code that hand-constructs a `Frame` (tests,
+ * older callers) isn't forced to specify it; treat a missing `items` the
+ * same as an empty array. `hazardFlags` is the raw `StageHazardUpdate`
+ * bitmask for this frame (see `HazardFlag`/`hasHazardFlag` in
+ * `constants.ts`) — `0`/absent means no tracked hazard is active, which is
+ * indistinguishable from "this file predates schema v3" from `Frame` alone;
+ * check `ReplayHeader.recorderSchemaVersion` if that distinction matters.
+ * `hitboxes`/`hurtboxes` are every `HitboxUpdate`/`HurtboxUpdate` recorded
+ * for this frame (empty before schema v5) — same "optional field defaults
+ * to empty array" treatment as `items`.
  */
 export interface Frame {
   readonly frame: number;
   readonly ports: Readonly<Partial<Record<PortIndex, FramePortData>>>;
   readonly items?: readonly ItemUpdate[];
+  readonly hazardFlags?: number;
+  readonly hitboxes?: readonly HitboxUpdate[];
+  readonly hurtboxes?: readonly HurtboxUpdate[];
 }
 
 /**

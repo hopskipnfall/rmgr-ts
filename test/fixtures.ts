@@ -2,6 +2,8 @@ import type {
   Frame,
   GameEnd,
   GameStart,
+  HitboxUpdate,
+  HurtboxUpdate,
   ItemUpdate,
   PortIndex,
   PortSettings,
@@ -50,10 +52,58 @@ export function makeItemUpdate(
   return {
     frame: 0,
     objectAddress: 0x80100000,
-    typeId: 0x00,
+    linkId: 5, // Weapon
+    kind: 0x00, // WPKind.Fireball
     positionX: 0,
     positionY: 0,
     positionZ: 0,
+    ...overrides,
+  };
+}
+
+export function makeHitboxUpdate(
+  overrides: Partial<HitboxUpdate> = {},
+): HitboxUpdate {
+  return {
+    frame: 0,
+    ownerKind: "fighter",
+    ownerId: 0,
+    slotIndex: 0,
+    attackState: 1, // fresh
+    damage: 10,
+    positionX: 0,
+    positionY: 0,
+    positionZ: 0,
+    size: 3,
+    angle: 45,
+    knockbackScale: 100,
+    knockbackWeight: 30,
+    knockbackBase: 20,
+    element: 0,
+    shieldDamage: 5,
+    ...overrides,
+  };
+}
+
+export function makeHurtboxUpdate(
+  overrides: Partial<HurtboxUpdate> = {},
+): HurtboxUpdate {
+  return {
+    frame: 0,
+    port: 0,
+    slotIndex: 0,
+    hitStatus: 0, // vulnerable
+    placement: 1, // middle
+    isGrabbable: true,
+    positionX: 0,
+    positionY: 0,
+    positionZ: 0,
+    offsetX: 0,
+    offsetY: 0,
+    offsetZ: 0,
+    sizeX: 2,
+    sizeY: 2,
+    sizeZ: 2,
     ...overrides,
   };
 }
@@ -62,6 +112,9 @@ export function makeFrame(
   frameNumber: number,
   ports: readonly PortIndex[] = [0, 1],
   items: readonly ItemUpdate[] = [],
+  hazardFlags = 0,
+  hitboxes: readonly HitboxUpdate[] = [],
+  hurtboxes: readonly HurtboxUpdate[] = [],
 ): Frame {
   const entry: { -readonly [K in PortIndex]?: Frame["ports"][K] } = {};
   for (const port of ports) {
@@ -89,7 +142,14 @@ export function makeFrame(
       },
     };
   }
-  return { frame: frameNumber, ports: entry, items };
+  return {
+    frame: frameNumber,
+    ports: entry,
+    items,
+    hazardFlags,
+    hitboxes,
+    hurtboxes,
+  };
 }
 
 export function makeGameEnd(overrides: Partial<GameEnd> = {}): GameEnd {

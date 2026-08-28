@@ -8,11 +8,14 @@ import {
   PLAYER_NAME_WIDTH,
   gameEndReasonToWire,
   handicapModeToWire,
+  hitboxOwnerKindToWire,
   slotTypeToWire,
 } from "./constants.js";
 import type {
   GameEnd,
   GameStart,
+  HitboxUpdate,
+  HurtboxUpdate,
   ItemUpdate,
   PortIndex,
   PostFrameUpdate,
@@ -29,6 +32,12 @@ const EVENT_PAYLOADS_ENTRIES: ReadonlyArray<readonly [EventCode, number]> = [
   [EventCode.PostFrameUpdate, EVENT_PAYLOAD_SIZES[EventCode.PostFrameUpdate]],
   [EventCode.GameEnd, EVENT_PAYLOAD_SIZES[EventCode.GameEnd]],
   [EventCode.ItemUpdate, EVENT_PAYLOAD_SIZES[EventCode.ItemUpdate]],
+  [
+    EventCode.StageHazardUpdate,
+    EVENT_PAYLOAD_SIZES[EventCode.StageHazardUpdate],
+  ],
+  [EventCode.HitboxUpdate, EVENT_PAYLOAD_SIZES[EventCode.HitboxUpdate]],
+  [EventCode.HurtboxUpdate, EVENT_PAYLOAD_SIZES[EventCode.HurtboxUpdate]],
 ];
 
 function writeEventPayloads(w: BinaryWriter): void {
@@ -114,10 +123,60 @@ function writeItemUpdate(w: BinaryWriter, item: ItemUpdate): void {
   w.writeU8(EventCode.ItemUpdate);
   w.writeI32(item.frame);
   w.writeU32(item.objectAddress);
-  w.writeU32(item.typeId);
+  w.writeU8(item.linkId);
+  w.writeI32(item.kind);
   w.writeF32(item.positionX);
   w.writeF32(item.positionY);
   w.writeF32(item.positionZ);
+}
+
+function writeStageHazardUpdate(
+  w: BinaryWriter,
+  frame: number,
+  hazardFlags: number,
+): void {
+  w.writeU8(EventCode.StageHazardUpdate);
+  w.writeI32(frame);
+  w.writeU8(hazardFlags);
+}
+
+function writeHitboxUpdate(w: BinaryWriter, hitbox: HitboxUpdate): void {
+  w.writeU8(EventCode.HitboxUpdate);
+  w.writeI32(hitbox.frame);
+  w.writeU8(hitboxOwnerKindToWire(hitbox.ownerKind));
+  w.writeU32(hitbox.ownerId);
+  w.writeU8(hitbox.slotIndex);
+  w.writeU8(hitbox.attackState);
+  w.writeI32(hitbox.damage);
+  w.writeF32(hitbox.positionX);
+  w.writeF32(hitbox.positionY);
+  w.writeF32(hitbox.positionZ);
+  w.writeF32(hitbox.size);
+  w.writeI32(hitbox.angle);
+  w.writeI32(hitbox.knockbackScale);
+  w.writeI32(hitbox.knockbackWeight);
+  w.writeI32(hitbox.knockbackBase);
+  w.writeI32(hitbox.element);
+  w.writeI32(hitbox.shieldDamage);
+}
+
+function writeHurtboxUpdate(w: BinaryWriter, hurtbox: HurtboxUpdate): void {
+  w.writeU8(EventCode.HurtboxUpdate);
+  w.writeI32(hurtbox.frame);
+  w.writeU8(hurtbox.port);
+  w.writeU8(hurtbox.slotIndex);
+  w.writeI32(hurtbox.hitStatus);
+  w.writeI32(hurtbox.placement);
+  w.writeU8(hurtbox.isGrabbable ? 1 : 0);
+  w.writeF32(hurtbox.positionX);
+  w.writeF32(hurtbox.positionY);
+  w.writeF32(hurtbox.positionZ);
+  w.writeF32(hurtbox.offsetX);
+  w.writeF32(hurtbox.offsetY);
+  w.writeF32(hurtbox.offsetZ);
+  w.writeF32(hurtbox.sizeX);
+  w.writeF32(hurtbox.sizeY);
+  w.writeF32(hurtbox.sizeZ);
 }
 
 function writeGameEnd(w: BinaryWriter, gameEnd: GameEnd): void {
@@ -160,6 +219,15 @@ export function serializeReplay(replay: SerializableReplay): Uint8Array {
     }
     for (const item of frame.items ?? []) {
       writeItemUpdate(eventStream, item);
+    }
+    if (frame.hazardFlags) {
+      writeStageHazardUpdate(eventStream, frame.frame, frame.hazardFlags);
+    }
+    for (const hitbox of frame.hitboxes ?? []) {
+      writeHitboxUpdate(eventStream, hitbox);
+    }
+    for (const hurtbox of frame.hurtboxes ?? []) {
+      writeHurtboxUpdate(eventStream, hurtbox);
     }
   }
 

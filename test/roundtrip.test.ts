@@ -5,6 +5,8 @@ import {
   makeFrame,
   makeGameEnd,
   makeGameStart,
+  makeHitboxUpdate,
+  makeHurtboxUpdate,
   makeItemUpdate,
   makeReplay,
 } from "./fixtures.js";
@@ -129,7 +131,8 @@ describe("serializeReplay -> parseReplay round trip", () => {
       makeItemUpdate({
         frame: 0,
         objectAddress: 0x80123456,
-        typeId: 0x05,
+        linkId: 5, // Weapon
+        kind: 0x07, // WPKind.Boomerang
         positionX: 12.5,
         positionY: -3.25,
         positionZ: 0.75,
@@ -137,7 +140,8 @@ describe("serializeReplay -> parseReplay round trip", () => {
       makeItemUpdate({
         frame: 0,
         objectAddress: 0x80123500,
-        typeId: 0x21,
+        linkId: 4, // Item
+        kind: 0x15, // ITKind.Bomb
       }),
     ];
     const input = makeReplay({
@@ -148,6 +152,82 @@ describe("serializeReplay -> parseReplay round trip", () => {
 
     expect(parsed.frames[0]?.items).toEqual(items0);
     expect(parsed.frames[1]?.items).toEqual([]);
+  });
+
+  it("round-trips StageHazardUpdate.hazardFlags, omitting the event on frames where it's 0", () => {
+    const input = makeReplay({
+      frames: [
+        { ...makeFrame(0, [0, 1]), hazardFlags: 0x01 },
+        makeFrame(1, [0, 1]),
+      ],
+    });
+    const bytes = serializeReplay(input);
+    const parsed = parseReplay(bytes);
+
+    expect(parsed.frames[0]?.hazardFlags).toBe(0x01);
+    expect(parsed.frames[1]?.hazardFlags).toBe(0);
+  });
+
+  it("round-trips HitboxUpdate events for fighters, items, and weapons on the same frame", () => {
+    const hitboxes0 = [
+      makeHitboxUpdate({
+        frame: 0,
+        ownerKind: "fighter",
+        ownerId: 0,
+        slotIndex: 2,
+        attackState: 1,
+        positionX: 5.5,
+        positionY: 10.25,
+        positionZ: -1.5,
+      }),
+      makeHitboxUpdate({
+        frame: 0,
+        ownerKind: "item",
+        ownerId: 0x80123500,
+        slotIndex: 0,
+        attackState: 3,
+      }),
+      makeHitboxUpdate({
+        frame: 0,
+        ownerKind: "weapon",
+        ownerId: 0x80123456,
+        slotIndex: 1,
+        attackState: 2,
+      }),
+    ];
+    const input = makeReplay({
+      frames: [
+        { ...makeFrame(0, [0, 1]), hitboxes: hitboxes0 },
+        makeFrame(1, [0, 1]),
+      ],
+    });
+    const parsed = parseReplay(serializeReplay(input));
+
+    expect(parsed.frames[0]?.hitboxes).toEqual(hitboxes0);
+    expect(parsed.frames[1]?.hitboxes).toEqual([]);
+  });
+
+  it("round-trips all 11 HurtboxUpdate slots for a seated port, every frame (not sparse)", () => {
+    const hurtboxes0 = Array.from({ length: 11 }, (_, slotIndex) =>
+      makeHurtboxUpdate({
+        frame: 0,
+        port: 1,
+        slotIndex,
+        hitStatus: slotIndex === 3 ? 3 : 0, // one intangible slot
+        placement: slotIndex < 4 ? 0 : slotIndex < 8 ? 1 : 2,
+        isGrabbable: slotIndex !== 5,
+        positionX: slotIndex,
+        positionY: -slotIndex,
+        positionZ: 0.25 * slotIndex,
+      }),
+    );
+    const input = makeReplay({
+      frames: [{ ...makeFrame(0, [0, 1]), hurtboxes: hurtboxes0 }],
+    });
+    const parsed = parseReplay(serializeReplay(input));
+
+    expect(parsed.frames[0]?.hurtboxes).toHaveLength(11);
+    expect(parsed.frames[0]?.hurtboxes).toEqual(hurtboxes0);
   });
 
   it("round-trips negative facing direction, negative velocity, and non-grounded state", () => {
