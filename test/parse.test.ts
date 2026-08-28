@@ -25,7 +25,8 @@ function buildRawFile(
   header.writeU32(streamLength);
   header.writeFixedString("SmashRemix2.0.1", GOOD_NAME_WIDTH);
   header.writeU32(1);
-  header.writeU64(1_766_000_000);
+  header.writeU64(1_766_000_000_000);
+  header.writeU32(0); // recordedAtNanosOffset
   const headerBytes = header.toUint8Array();
   const result = new Uint8Array(headerBytes.byteLength + eventBytes.byteLength);
   result.set(headerBytes, 0);

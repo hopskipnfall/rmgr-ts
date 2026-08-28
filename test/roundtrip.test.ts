@@ -20,14 +20,15 @@ describe("serializeReplay -> parseReplay round trip", () => {
     expect(parsed.gameStart).toEqual(input.gameStart);
     expect(parsed.frames).toEqual(input.frames);
     expect(parsed.gameEnd).toEqual(input.gameEnd);
-    expect(parsed.header.version).toBe(3);
+    expect(parsed.header.version).toBe(4);
     expect(parsed.header.goodName).toBe(input.goodName);
     expect(parsed.header.recorderSchemaVersion).toBe(
       input.recorderSchemaVersion,
     );
-    expect(parsed.header.recordedAtEpochSeconds).toBe(
-      input.recordedAtEpochSeconds,
+    expect(parsed.header.recordedAtEpochMillis).toBe(
+      input.recordedAtEpochMillis,
     );
+    expect(parsed.header.recordedAtNanosOffset).toBe(0);
     expect(parsed.isComplete).toBe(true);
   });
 

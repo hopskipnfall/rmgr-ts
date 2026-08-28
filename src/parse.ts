@@ -62,13 +62,15 @@ function parseHeader(reader: BinaryReader): ReplayHeader {
   const streamLength = reader.readU32();
   const goodName = reader.readFixedUtf8String(GOOD_NAME_WIDTH);
   const recorderSchemaVersion = reader.readU32();
-  const recordedAtEpochSeconds = reader.readU64();
+  const recordedAtEpochMillis = reader.readU64();
+  const recordedAtNanosOffset = reader.readU32();
   return {
     version,
     streamLength,
     goodName,
     recorderSchemaVersion,
-    recordedAtEpochSeconds,
+    recordedAtEpochMillis,
+    recordedAtNanosOffset,
   };
 }
 

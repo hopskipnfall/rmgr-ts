@@ -86,9 +86,10 @@ export class BinaryReader {
 
   /**
    * Reads a u64 as a plain `number` (not `bigint`) - every value this format
-   * actually stores in a u64 (currently just `recordedAtEpochSeconds`) is
-   * far under `Number.MAX_SAFE_INTEGER`, so the precision loss a `bigint`
-   * would avoid never applies here in practice.
+   * actually stores in a u64 (currently just `recordedAtEpochMillis`) is far
+   * under `Number.MAX_SAFE_INTEGER` (milliseconds since the epoch is ~13
+   * digits; that limit is 16), so the precision loss a `bigint` would avoid
+   * never applies here in practice.
    */
   readU64(): number {
     this.require(8);

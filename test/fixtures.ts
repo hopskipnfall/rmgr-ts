@@ -166,7 +166,7 @@ export function makeReplay(
   return {
     goodName: "SmashRemix2.0.1",
     recorderSchemaVersion: 1,
-    recordedAtEpochSeconds: 1_766_000_000,
+    recordedAtEpochMillis: 1_766_000_000_000,
     gameStart: makeGameStart(),
     frames: [makeFrame(0), makeFrame(1), makeFrame(2)],
     gameEnd: makeGameEnd(),

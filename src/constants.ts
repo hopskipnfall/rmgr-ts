@@ -11,15 +11,17 @@ export const MAGIC = "RMGR";
 /**
  * The only format version this package currently reads and writes. Bumped
  * 1 -> 2 to add `goodName`/`recorderSchemaVersion`, then 2 -> 3 to add
- * `recordedAtEpochSeconds` (docs/RMGR_SPEC.md §3.1/§5) - each a deliberate
- * breaking change to the header layout itself, not something the
- * field-append/new-event mechanisms (§5) could cover. Files predating
- * version 3 aren't expected to parse under this version of the package.
+ * `recordedAtEpochSeconds`, then 3 -> 4 to replace that with
+ * `recordedAtEpochMillis` + `recordedAtNanosOffset` (docs/RMGR_SPEC.md
+ * §3.1/§5) - each a deliberate breaking change to the header layout itself,
+ * not something the field-append/new-event mechanisms (§5) could cover.
+ * Files predating version 4 aren't expected to parse under this version of
+ * the package.
  */
-export const FORMAT_VERSION = 3;
+export const FORMAT_VERSION = 4;
 
 /** Fixed size of the file header, in bytes. */
-export const HEADER_SIZE = 88;
+export const HEADER_SIZE = 92;
 
 /** Fixed width of the header's `goodName` field, in bytes. */
 export const GOOD_NAME_WIDTH = 64;
