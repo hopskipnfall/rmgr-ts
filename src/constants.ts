@@ -148,6 +148,13 @@ export function hasButton(buttons: number, bits: number): boolean {
 /** `StageHazardUpdate.hazardFlags` bits — see `docs/RMGR_SPEC.md` §7.7. */
 export const HazardFlag = {
   WhispyBlowing: 0x01,
+  /**
+   * Wind direction: unset = blowing left, set = blowing right. Only
+   * meaningful (and only ever set by the recorder) when `WhispyBlowing`
+   * is also set. Recorder schema v9+ only — always unset on an earlier
+   * file, indistinguishable from a genuine "blowing left" read.
+   */
+  WhispyBlowingRight: 0x02,
 } as const;
 
 export type HazardFlag = (typeof HazardFlag)[keyof typeof HazardFlag];
