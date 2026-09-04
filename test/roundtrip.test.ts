@@ -2,25 +2,29 @@ import { describe, expect, it } from "vitest";
 import { parseReplay } from "../src/parse.js";
 import { serializeReplay } from "../src/serialize.js";
 import {
+  makeCoreOnlyReplay,
   makeFrame,
-  makeGameEnd,
-  makeGameStart,
-  makeHitboxUpdate,
-  makeHurtboxUpdate,
   makeItemUpdate,
+  makeMatchEnd,
+  makeMatchResult,
+  makeMatchSettings,
+  makeMatchStart,
   makeReplay,
 } from "./fixtures.js";
 
 describe("serializeReplay -> parseReplay round trip", () => {
-  it("preserves gameStart, frames, and gameEnd exactly for a typical match", () => {
+  it("preserves matchStart, matchSettings, frames, matchEnd, matchResult exactly for a typical match", async () => {
     const input = makeReplay();
-    const bytes = serializeReplay(input);
-    const parsed = parseReplay(bytes);
+    const bytes = await serializeReplay(input);
+    const parsed = await parseReplay(bytes);
 
-    expect(parsed.gameStart).toEqual(input.gameStart);
+    expect(parsed.matchStart).toEqual(input.matchStart);
+    expect(parsed.matchSettings).toEqual(input.matchSettings);
     expect(parsed.frames).toEqual(input.frames);
-    expect(parsed.gameEnd).toEqual(input.gameEnd);
-    expect(parsed.header.version).toBe(4);
+    expect(parsed.matchEnd).toEqual(input.matchEnd);
+    expect(parsed.matchResult).toEqual(input.matchResult);
+    expect(parsed.header.version).toBe(5);
+    expect(parsed.header.gameFamily).toBe(input.gameFamily);
     expect(parsed.header.goodName).toBe(input.goodName);
     expect(parsed.header.recorderSchemaVersion).toBe(
       input.recorderSchemaVersion,
@@ -28,106 +32,65 @@ describe("serializeReplay -> parseReplay round trip", () => {
     expect(parsed.header.recordedAtEpochMillis).toBe(
       input.recordedAtEpochMillis,
     );
-    expect(parsed.header.recordedAtNanosOffset).toBe(0);
-    expect(parsed.isComplete).toBe(true);
+    expect(parsed.header.uncompressedLength).toBeGreaterThan(0);
+    expect(parsed.header.compressedLength).toBeGreaterThan(0);
   });
 
-  it("round-trips teams/handicap match settings and per-port team/handicap/cpuLevel", () => {
+  it("round-trips a core-only (unrecognized game) file with only InputFrame data", async () => {
+    const input = makeCoreOnlyReplay();
+    const parsed = await parseReplay(await serializeReplay(input));
+
+    expect(parsed.header.gameFamily).toBe("");
+    expect(parsed.matchSettings).toBeNull();
+    expect(parsed.matchResult).toBeNull();
+    expect(parsed.matchStart).toEqual(input.matchStart);
+    for (const frame of parsed.frames) {
+      for (const portData of Object.values(frame.ports)) {
+        expect(portData?.state).toBeUndefined();
+      }
+    }
+  });
+
+  it("round-trips teams/handicap match settings and per-port team/handicap/cpuLevel", async () => {
     const input = makeReplay({
-      gameStart: makeGameStart({
+      matchSettings: makeMatchSettings({
         teamsEnabled: true,
         handicapMode: "auto",
-        ports: [
-          {
-            slotType: "human",
-            characterId: 0x0b,
-            costumeId: 0,
-            teamColor: 0,
-            team: 1,
-            handicap: 15,
-            cpuLevel: 0,
-          },
-          {
-            slotType: "cpu",
-            characterId: 0x01,
-            costumeId: 2,
-            teamColor: 1,
-            team: 2,
-            handicap: 30,
-            cpuLevel: 9,
-          },
-          {
-            slotType: "empty",
-            characterId: 0,
-            costumeId: 0,
-            teamColor: 0,
-            team: 0,
-            handicap: 0,
-            cpuLevel: 0,
-          },
-          {
-            slotType: "empty",
-            characterId: 0,
-            costumeId: 0,
-            teamColor: 0,
-            team: 0,
-            handicap: 0,
-            cpuLevel: 0,
-          },
-        ],
+        characterId: [0x0b, 0x01, 0, 0],
+        costumeId: [0, 2, 0, 0],
+        teamColor: [0, 1, 0, 0],
+        portTeam: [1, 2, 0, 0],
+        portHandicap: [15, 30, 0, 0],
+        portCpuLevel: [0, 9, 0, 0],
       }),
     });
-    const parsed = parseReplay(serializeReplay(input));
+    const parsed = await parseReplay(await serializeReplay(input));
 
-    expect(parsed.gameStart.teamsEnabled).toBe(true);
-    expect(parsed.gameStart.handicapMode).toBe("auto");
-    expect(parsed.gameStart.ports[0]).toMatchObject({
-      team: 1,
-      handicap: 15,
-      cpuLevel: 0,
-    });
-    expect(parsed.gameStart.ports[1]).toMatchObject({
-      team: 2,
-      handicap: 30,
-      cpuLevel: 9,
-    });
+    expect(parsed.matchSettings?.teamsEnabled).toBe(true);
+    expect(parsed.matchSettings?.handicapMode).toBe("auto");
+    expect(parsed.matchSettings?.portTeam).toEqual([1, 2, 0, 0]);
+    expect(parsed.matchSettings?.portHandicap).toEqual([15, 30, 0, 0]);
+    expect(parsed.matchSettings?.portCpuLevel).toEqual([0, 9, 0, 0]);
   });
 
-  it("round-trips a file with no GameEnd as an incomplete recording", () => {
-    const input = makeReplay({ gameEnd: null });
-    const parsed = parseReplay(serializeReplay(input));
-
-    expect(parsed.gameEnd).toBeNull();
-    expect(parsed.isComplete).toBe(false);
-    expect(parsed.gameStart).toEqual(input.gameStart);
-    expect(parsed.frames).toEqual(input.frames);
-  });
-
-  it("round-trips an offline match with no player names and no seated CPU/empty ports", () => {
+  it("round-trips an offline match with no player names and an aborted end", async () => {
     const input = makeReplay({
-      gameStart: makeGameStart({
+      matchStart: makeMatchStart({
         playerNames: ["", "", "", ""],
-        ports: [
-          { slotType: "human", characterId: 0x00, costumeId: 0, teamColor: 0 },
-          { slotType: "cpu", characterId: 0x07, costumeId: 2, teamColor: 1 },
-          { slotType: "empty", characterId: 0, costumeId: 0, teamColor: 0 },
-          { slotType: "empty", characterId: 0, costumeId: 0, teamColor: 0 },
-        ],
+        slotType: ["human", "cpu", "empty", "empty"],
       }),
       frames: [makeFrame(0, [0, 1])],
-      gameEnd: makeGameEnd({
-        endReason: "aborted",
-        placements: [-1, -1, -1, -1],
-      }),
+      matchEnd: makeMatchEnd({ endReason: "aborted" }),
+      matchResult: makeMatchResult({ placements: [-1, -1, -1, -1] }),
     });
-    const parsed = parseReplay(serializeReplay(input));
+    const parsed = await parseReplay(await serializeReplay(input));
 
-    expect(parsed.gameStart.playerNames).toEqual(["", "", "", ""]);
-    expect(parsed.gameStart.ports[1].slotType).toBe("cpu");
-    expect(parsed.gameEnd?.endReason).toBe("aborted");
+    expect(parsed.matchStart.playerNames).toEqual(["", "", "", ""]);
+    expect(parsed.matchStart.slotType[1]).toBe("cpu");
+    expect(parsed.matchEnd.endReason).toBe("aborted");
   });
 
-  it("round-trips ItemUpdate events, including multiple items on the same frame", () => {
+  it("round-trips ItemUpdate events, including multiple items on the same frame", async () => {
     const items0 = [
       makeItemUpdate({
         frame: 0,
@@ -148,101 +111,39 @@ describe("serializeReplay -> parseReplay round trip", () => {
     const input = makeReplay({
       frames: [makeFrame(0, [0, 1], items0), makeFrame(1, [0, 1])],
     });
-    const bytes = serializeReplay(input);
-    const parsed = parseReplay(bytes);
+    const bytes = await serializeReplay(input);
+    const parsed = await parseReplay(bytes);
 
     expect(parsed.frames[0]?.items).toEqual(items0);
     expect(parsed.frames[1]?.items).toEqual([]);
   });
 
-  it("round-trips StageHazardUpdate.hazardFlags, omitting the event on frames where it's 0", () => {
+  it("round-trips StageHazardUpdate.hazardFlags, omitting the event on frames where it's 0", async () => {
     const input = makeReplay({
       frames: [
         { ...makeFrame(0, [0, 1]), hazardFlags: 0x01 },
         makeFrame(1, [0, 1]),
       ],
     });
-    const bytes = serializeReplay(input);
-    const parsed = parseReplay(bytes);
+    const bytes = await serializeReplay(input);
+    const parsed = await parseReplay(bytes);
 
     expect(parsed.frames[0]?.hazardFlags).toBe(0x01);
     expect(parsed.frames[1]?.hazardFlags).toBe(0);
   });
 
-  it("round-trips HitboxUpdate events for fighters, items, and weapons on the same frame", () => {
-    const hitboxes0 = [
-      makeHitboxUpdate({
-        frame: 0,
-        ownerKind: "fighter",
-        ownerId: 0,
-        slotIndex: 2,
-        attackState: 1,
-        positionX: 5.5,
-        positionY: 10.25,
-        positionZ: -1.5,
-      }),
-      makeHitboxUpdate({
-        frame: 0,
-        ownerKind: "item",
-        ownerId: 0x80123500,
-        slotIndex: 0,
-        attackState: 3,
-      }),
-      makeHitboxUpdate({
-        frame: 0,
-        ownerKind: "weapon",
-        ownerId: 0x80123456,
-        slotIndex: 1,
-        attackState: 2,
-      }),
-    ];
-    const input = makeReplay({
-      frames: [
-        { ...makeFrame(0, [0, 1]), hitboxes: hitboxes0 },
-        makeFrame(1, [0, 1]),
-      ],
-    });
-    const parsed = parseReplay(serializeReplay(input));
-
-    expect(parsed.frames[0]?.hitboxes).toEqual(hitboxes0);
-    expect(parsed.frames[1]?.hitboxes).toEqual([]);
-  });
-
-  it("round-trips all 11 HurtboxUpdate slots for a seated port, every frame (not sparse)", () => {
-    const hurtboxes0 = Array.from({ length: 11 }, (_, slotIndex) =>
-      makeHurtboxUpdate({
-        frame: 0,
-        port: 1,
-        slotIndex,
-        hitStatus: slotIndex === 3 ? 3 : 0, // one intangible slot
-        placement: slotIndex < 4 ? 0 : slotIndex < 8 ? 1 : 2,
-        isGrabbable: slotIndex !== 5,
-        positionX: slotIndex,
-        positionY: -slotIndex,
-        positionZ: 0.25 * slotIndex,
-      }),
-    );
-    const input = makeReplay({
-      frames: [{ ...makeFrame(0, [0, 1]), hurtboxes: hurtboxes0 }],
-    });
-    const parsed = parseReplay(serializeReplay(input));
-
-    expect(parsed.frames[0]?.hurtboxes).toHaveLength(11);
-    expect(parsed.frames[0]?.hurtboxes).toEqual(hurtboxes0);
-  });
-
-  it("round-trips negative facing direction, negative velocity, and non-grounded state", () => {
+  it("round-trips negative facing direction, negative velocity, and non-grounded state", async () => {
     const frame = makeFrame(5, [0]);
-    const post = frame.ports[0]!.post;
+    const state = frame.ports[0]!.state!;
     const input = makeReplay({
       frames: [
         {
           frame: 5,
           ports: {
             0: {
-              pre: frame.ports[0]!.pre,
-              post: {
-                ...post,
+              input: frame.ports[0]!.input,
+              state: {
+                ...state,
                 facingDirection: -1,
                 velocityX: -12.5,
                 velocityY: 3.25,
@@ -254,50 +155,50 @@ describe("serializeReplay -> parseReplay round trip", () => {
         },
       ],
     });
-    const parsed = parseReplay(serializeReplay(input));
-    const parsedPost = parsed.frames[0]?.ports[0]?.post;
+    const parsed = await parseReplay(await serializeReplay(input));
+    const parsedState = parsed.frames[0]?.ports[0]?.state;
 
-    expect(parsedPost?.facingDirection).toBe(-1);
-    expect(parsedPost?.velocityX).toBeCloseTo(-12.5, 5);
-    expect(parsedPost?.velocityY).toBeCloseTo(3.25, 5);
-    expect(parsedPost?.grounded).toBe(false);
+    expect(parsedState?.facingDirection).toBe(-1);
+    expect(parsedState?.velocityX).toBeCloseTo(-12.5, 5);
+    expect(parsedState?.velocityY).toBeCloseTo(3.25, 5);
+    expect(parsedState?.grounded).toBe(false);
   });
 
-  it("preserves frame order even if frames are passed out of order", () => {
+  it("preserves frame order even if frames are passed out of order", async () => {
     const input = makeReplay({
       frames: [makeFrame(2), makeFrame(0), makeFrame(1)],
     });
-    const parsed = parseReplay(serializeReplay(input));
+    const parsed = await parseReplay(await serializeReplay(input));
     expect(parsed.frames.map((f) => f.frame)).toEqual([0, 1, 2]);
   });
 
-  it("round-trips a frame where only some ports are seated", () => {
+  it("round-trips a frame where only some ports are seated", async () => {
     const input = makeReplay({
       frames: [makeFrame(0, [0]), makeFrame(1, [1, 3])],
     });
-    const parsed = parseReplay(serializeReplay(input));
+    const parsed = await parseReplay(await serializeReplay(input));
 
     expect(Object.keys(parsed.frames[0]!.ports)).toEqual(["0"]);
     expect(Object.keys(parsed.frames[1]!.ports).sort()).toEqual(["1", "3"]);
   });
 
-  it("round-trips a match with zero recorded frames (e.g. aborted before the first frame)", () => {
+  it("round-trips a match with zero recorded frames (e.g. aborted before the first frame)", async () => {
     const input = makeReplay({
       frames: [],
-      gameEnd: makeGameEnd({ endReason: "aborted" }),
+      matchEnd: makeMatchEnd({ endReason: "aborted", finalFrame: 0 }),
     });
-    const parsed = parseReplay(serializeReplay(input));
+    const parsed = await parseReplay(await serializeReplay(input));
     expect(parsed.frames).toEqual([]);
-    expect(parsed.gameEnd?.endReason).toBe("aborted");
+    expect(parsed.matchEnd.endReason).toBe("aborted");
   });
 
-  it("preserves 32-character player names at exactly the field width", () => {
+  it("preserves 32-character player names at exactly the field width", async () => {
     const name32 = "abcdefghijklmnopqrstuvwxyz012345".slice(0, 32);
     expect(name32).toHaveLength(32);
     const input = makeReplay({
-      gameStart: makeGameStart({ playerNames: [name32, "", "", ""] }),
+      matchStart: makeMatchStart({ playerNames: [name32, "", "", ""] }),
     });
-    const parsed = parseReplay(serializeReplay(input));
-    expect(parsed.gameStart.playerNames[0]).toBe(name32);
+    const parsed = await parseReplay(await serializeReplay(input));
+    expect(parsed.matchStart.playerNames[0]).toBe(name32);
   });
 });

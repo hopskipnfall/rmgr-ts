@@ -1,5 +1,6 @@
 export { parseReplay, ReplayParseError } from "./parse.js";
 export { serializeReplay } from "./serialize.js";
+export { deflate, inflate } from "./compression.js";
 export { getFrame, getPortTimeline, getSeatedPorts } from "./query.js";
 export type { PortFrame } from "./query.js";
 
@@ -9,6 +10,7 @@ export {
   FORMAT_VERSION,
   HazardFlag,
   MAGIC,
+  SMASH_64_FAMILY,
   hasButton,
   hasHazardFlag,
 } from "./constants.js";
@@ -59,18 +61,18 @@ export type {
 export type {
   Frame,
   FramePortData,
-  GameEnd,
   GameEndReason,
-  GameStart,
-  HitboxUpdate,
-  HurtboxUpdate,
+  HandicapMode,
+  InputFrame,
   ItemUpdate,
+  MatchEnd,
+  MatchResult,
+  MatchSettings,
+  MatchStart,
   PortIndex,
-  PortSettings,
-  PostFrameUpdate,
-  PreFrameUpdate,
   Replay,
   ReplayHeader,
   SerializableReplay,
   SlotType,
+  StateFrame,
 } from "./types.js";

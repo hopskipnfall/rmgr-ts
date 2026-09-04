@@ -1,31 +1,28 @@
+import { SMASH_64_FAMILY } from "../src/constants.js";
 import type {
   Frame,
-  GameEnd,
-  GameStart,
-  HitboxUpdate,
-  HurtboxUpdate,
   ItemUpdate,
+  MatchEnd,
+  MatchResult,
+  MatchSettings,
+  MatchStart,
   PortIndex,
-  PortSettings,
   SerializableReplay,
 } from "../src/types.js";
 
-export function makePortSettings(
-  overrides: Partial<PortSettings> = {},
-): PortSettings {
+export function makeMatchStart(
+  overrides: Partial<MatchStart> = {},
+): MatchStart {
   return {
-    slotType: "human",
-    characterId: 0,
-    costumeId: 0,
-    teamColor: 0,
-    team: 0,
-    handicap: 0,
-    cpuLevel: 0,
+    playerNames: ["Alice", "Bob", "", ""],
+    slotType: ["human", "human", "empty", "empty"],
     ...overrides,
   };
 }
 
-export function makeGameStart(overrides: Partial<GameStart> = {}): GameStart {
+export function makeMatchSettings(
+  overrides: Partial<MatchSettings> = {},
+): MatchSettings {
   return {
     stageId: 0x10,
     gameType: 2,
@@ -35,13 +32,12 @@ export function makeGameStart(overrides: Partial<GameStart> = {}): GameStart {
     itemFrequency: 0,
     teamsEnabled: false,
     handicapMode: "off",
-    ports: [
-      makePortSettings({ slotType: "human", characterId: 0x0b }), // Ness
-      makePortSettings({ slotType: "human", characterId: 0x01 }), // Fox
-      makePortSettings({ slotType: "empty" }),
-      makePortSettings({ slotType: "empty" }),
-    ],
-    playerNames: ["Alice", "Bob", "", ""],
+    characterId: [0x0b, 0x01, 0, 0], // Ness, Fox
+    costumeId: [0, 0, 0, 0],
+    teamColor: [0, 0, 0, 0],
+    portTeam: [0, 0, 0, 0],
+    portHandicap: [0, 0, 0, 0],
+    portCpuLevel: [0, 0, 0, 0],
     ...overrides,
   };
 }
@@ -61,85 +57,41 @@ export function makeItemUpdate(
   };
 }
 
-export function makeHitboxUpdate(
-  overrides: Partial<HitboxUpdate> = {},
-): HitboxUpdate {
-  return {
-    frame: 0,
-    ownerKind: "fighter",
-    ownerId: 0,
-    slotIndex: 0,
-    attackState: 1, // fresh
-    damage: 10,
-    positionX: 0,
-    positionY: 0,
-    positionZ: 0,
-    size: 3,
-    angle: 45,
-    knockbackScale: 100,
-    knockbackWeight: 30,
-    knockbackBase: 20,
-    element: 0,
-    shieldDamage: 5,
-    ...overrides,
-  };
-}
-
-export function makeHurtboxUpdate(
-  overrides: Partial<HurtboxUpdate> = {},
-): HurtboxUpdate {
-  return {
-    frame: 0,
-    port: 0,
-    slotIndex: 0,
-    hitStatus: 0, // vulnerable
-    placement: 1, // middle
-    isGrabbable: true,
-    positionX: 0,
-    positionY: 0,
-    positionZ: 0,
-    offsetX: 0,
-    offsetY: 0,
-    offsetZ: 0,
-    sizeX: 2,
-    sizeY: 2,
-    sizeZ: 2,
-    ...overrides,
-  };
-}
-
 export function makeFrame(
   frameNumber: number,
   ports: readonly PortIndex[] = [0, 1],
   items: readonly ItemUpdate[] = [],
   hazardFlags = 0,
-  hitboxes: readonly HitboxUpdate[] = [],
-  hurtboxes: readonly HurtboxUpdate[] = [],
+  familyRecognized = true,
 ): Frame {
   const entry: { -readonly [K in PortIndex]?: Frame["ports"][K] } = {};
   for (const port of ports) {
     entry[port] = {
-      pre: { frame: frameNumber, port, buttons: 0, stickX: 0, stickY: 0 },
-      post: {
-        frame: frameNumber,
-        port,
-        characterId: port === 0 ? 0x0b : 0x01,
-        actionStateId: 0x00a,
-        positionX: 0,
-        positionY: 0,
-        facingDirection: 1,
-        velocityX: 0,
-        velocityY: 0,
-        damagePercent: 0,
-        stocksRemaining: 2,
-        jumpsRemaining: 0,
-        grounded: true,
-        hurtboxState: 0,
-        hitstunCounter: 0,
-        actionFrameCounter: frameNumber,
-        comboHitCount: 0,
-        comboDamage: 0,
-      },
+      input: { frame: frameNumber, port, buttons: 0, stickX: 0, stickY: 0 },
+      ...(familyRecognized
+        ? {
+            state: {
+              frame: frameNumber,
+              port,
+              characterId: port === 0 ? 0x0b : 0x01,
+              actionStateId: 0x00a,
+              positionX: 0,
+              positionY: 0,
+              facingDirection: 1 as const,
+              velocityX: 0,
+              velocityY: 0,
+              damagePercent: 0,
+              stocksRemaining: 2,
+              jumpsRemaining: 0,
+              grounded: true,
+              hurtboxState: 0,
+              hitstunCounter: 0,
+              actionFrameCounter: frameNumber,
+              comboHitCount: 0,
+              comboDamage: 0,
+            },
+          }
+        : {}),
     };
   }
   return {
@@ -147,14 +99,21 @@ export function makeFrame(
     ports: entry,
     items,
     hazardFlags,
-    hitboxes,
-    hurtboxes,
   };
 }
 
-export function makeGameEnd(overrides: Partial<GameEnd> = {}): GameEnd {
+export function makeMatchEnd(overrides: Partial<MatchEnd> = {}): MatchEnd {
   return {
+    finalFrame: 2,
     endReason: "normal",
+    ...overrides,
+  };
+}
+
+export function makeMatchResult(
+  overrides: Partial<MatchResult> = {},
+): MatchResult {
+  return {
     placements: [1, -1, -1, -1],
     ...overrides,
   };
@@ -164,12 +123,33 @@ export function makeReplay(
   overrides: Partial<SerializableReplay> = {},
 ): SerializableReplay {
   return {
+    gameFamily: SMASH_64_FAMILY,
     goodName: "SmashRemix2.0.1",
     recorderSchemaVersion: 1,
     recordedAtEpochMillis: 1_766_000_000_000,
-    gameStart: makeGameStart(),
+    matchStart: makeMatchStart(),
+    matchSettings: makeMatchSettings(),
     frames: [makeFrame(0), makeFrame(1), makeFrame(2)],
-    gameEnd: makeGameEnd(),
+    matchEnd: makeMatchEnd(),
+    matchResult: makeMatchResult(),
+    ...overrides,
+  };
+}
+
+/** A core-only (unrecognized game) replay - no gameFamily/matchSettings/matchResult, and frames only ever carry `input`. */
+export function makeCoreOnlyReplay(
+  overrides: Partial<SerializableReplay> = {},
+): SerializableReplay {
+  return {
+    goodName: "SomeOtherGame",
+    recordedAtEpochMillis: 1_766_000_000_000,
+    matchStart: makeMatchStart(),
+    frames: [
+      makeFrame(0, [0, 1], [], 0, false),
+      makeFrame(1, [0, 1], [], 0, false),
+      makeFrame(2, [0, 1], [], 0, false),
+    ],
+    matchEnd: makeMatchEnd(),
     ...overrides,
   };
 }
