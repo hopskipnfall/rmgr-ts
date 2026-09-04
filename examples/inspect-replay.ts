@@ -14,7 +14,7 @@ import {
   getSeatedPorts,
   getCharacterName,
   getStageName,
-  type GameStart,
+  type MatchStart,
   type PortIndex,
   type Replay,
 } from "../dist/index.js";
@@ -34,18 +34,19 @@ function gameTypeName(gameType: number): string {
   );
 }
 
-function playerLabel(gameStart: GameStart, port: PortIndex): string {
-  const name = gameStart.playerNames[port];
+function playerLabel(matchStart: MatchStart, port: PortIndex): string {
+  const name = matchStart.playerNames[port];
   return name.length > 0 ? name : `Port ${port + 1}`;
 }
 
 /**
- * `stocksRemaining`/`GameEnd.placements` are 0-based (see docs/RMGR_SPEC.md
- * section 4.4/4.5: "0 means still on your last stock", not "0 stocks left").
- * `-1` in `placements` specifically means "not seated at match end", which
- * covers two different real situations this function distinguishes: a port
- * that never played this match at all, and a port that WAS eliminated
- * (its last stock was taken) - both read the same -1 in the raw field.
+ * `stocksRemaining`/`MatchResult.placements` are 0-based (see
+ * docs/RMGR_SPEC.md: "0 means still on your last stock", not "0 stocks
+ * left"). `-1` in `placements` specifically means "not seated at match
+ * end", which covers two different real situations this function
+ * distinguishes: a port that never played this match at all, and a port
+ * that WAS eliminated (its last stock was taken) - both read the same -1
+ * in the raw field.
  */
 function humanStocks(placement: number, wasSeated: boolean): string {
   if (placement >= 0) {
@@ -55,41 +56,17 @@ function humanStocks(placement: number, wasSeated: boolean): string {
   return wasSeated ? "eliminated" : "n/a (didn't play)";
 }
 
-/**
- * Winner by GameEnd.placements (authoritative - see humanStocks' doc
- * comment on the -1 sentinel), falling back to the last recorded frame
- * only for a truncated file with no GameEnd event at all. Deliberately
- * does NOT cross-check against the last frame's raw stocksRemaining when
- * GameEnd is present: right at a KO, the loser's actual elimination
- * (their stock count going negative) often isn't captured before the
- * recording finalizes, so their last recorded stocksRemaining can still
- * read identically to the winner's - comparing raw values there produces
- * false "disagreements", not a real signal. action state / damage% are
- * better ad-hoc signals for that specific case, not stocksRemaining.
- */
+/** Winner by MatchResult.placements - only present for a smash64-family file. */
 function determineWinner(replay: Replay): string {
   const seatedPorts = getSeatedPorts(replay);
   if (seatedPorts.length < 2) {
     return "n/a (fewer than 2 ports recorded)";
   }
-
-  if (!replay.gameEnd) {
-    const lastFrame = replay.frames[replay.frames.length - 1];
-    const best = seatedPorts
-      .map(
-        (port) =>
-          [
-            port,
-            lastFrame?.ports[port]?.post.stocksRemaining ?? -Infinity,
-          ] as const,
-      )
-      .sort((a, b) => b[1] - a[1])[0];
-    return best && best[1] > -Infinity
-      ? `${playerLabel(replay.gameStart, best[0])} (inferred from last recorded frame - file has no GameEnd event)`
-      : "unknown (no GameEnd event and no frame data)";
+  if (!replay.matchResult) {
+    return "n/a (core-only file - no smash64 result data)";
   }
 
-  const placements = replay.gameEnd.placements;
+  const placements = replay.matchResult.placements;
   const best = seatedPorts
     .map((port) => [port, placements[port]] as const)
     .sort((a, b) => b[1] - a[1])[0];
@@ -98,54 +75,66 @@ function determineWinner(replay: Replay): string {
     return "unknown";
   }
   const [winnerPort, winnerPlacement] = best;
-  return `${playerLabel(replay.gameStart, winnerPort)} (${humanStocks(winnerPlacement, true)})`;
+  return `${playerLabel(replay.matchStart, winnerPort)} (${humanStocks(winnerPlacement, true)})`;
 }
 
-function inspectFile(path: string): void {
+async function inspectFile(path: string): Promise<void> {
   const bytes = new Uint8Array(readFileSync(path));
-  const replay = parseReplay(bytes);
-  const { gameStart, gameEnd } = replay;
+  const replay = await parseReplay(bytes);
+  const { matchStart, matchSettings, matchEnd, matchResult } = replay;
 
   const durationSeconds = replay.frames.length / 60; // NTSC
 
   console.log(`\n=== ${path} ===`);
   console.log(
-    `Format version: ${replay.header.version} | Complete: ${replay.isComplete}`,
-  );
-  console.log(
-    `Stage: ${stageName(gameStart.stageId)} | Mode: ${gameTypeName(gameStart.gameType)}`,
-  );
-  console.log(
-    `Stocks: ${gameStart.stockCountSetting + 1} | Time limit: ${gameStart.timeLimitMinutes === 100 ? "infinite" : `${gameStart.timeLimitMinutes} min`} | Damage ratio: ${gameStart.damageRatio}%`,
+    `Format version: ${replay.header.version} | Game family: ${replay.header.gameFamily || "(unrecognized)"}`,
   );
   console.log(
     `Frames recorded: ${replay.frames.length} (~${durationSeconds.toFixed(1)}s @ 60fps)`,
   );
   console.log(
-    `Teams: ${gameStart.teamsEnabled ? "on" : "off"} | Handicap: ${gameStart.handicapMode}`,
+    `Compressed: ${replay.header.compressedLength} bytes (${replay.header.uncompressedLength} uncompressed)`,
   );
 
-  console.log("Players:");
-  for (const port of getSeatedPorts(replay)) {
-    const settings = gameStart.ports[port];
-    const finalStocks = gameEnd
-      ? humanStocks(gameEnd.placements[port], true)
-      : "unknown (truncated recording)";
-    const extras: string[] = [];
-    if (gameStart.teamsEnabled) extras.push(`team ${settings.team}`);
-    if (gameStart.handicapMode !== "off")
-      extras.push(`handicap ${settings.handicap}`);
-    if (settings.slotType === "cpu")
-      extras.push(`CPU level ${settings.cpuLevel}`);
+  if (matchSettings) {
     console.log(
-      `  Port ${port + 1}: ${playerLabel(gameStart, port)} — ${characterName(settings.characterId)}` +
-        ` (${settings.slotType})${extras.length ? ` [${extras.join(", ")}]` : ""}, final: ${finalStocks}`,
+      `Stage: ${stageName(matchSettings.stageId)} | Mode: ${gameTypeName(matchSettings.gameType)}`,
+    );
+    console.log(
+      `Stocks: ${matchSettings.stockCountSetting + 1} | Time limit: ${matchSettings.timeLimitMinutes === 100 ? "infinite" : `${matchSettings.timeLimitMinutes} min`} | Damage ratio: ${matchSettings.damageRatio}%`,
+    );
+    console.log(
+      `Teams: ${matchSettings.teamsEnabled ? "on" : "off"} | Handicap: ${matchSettings.handicapMode}`,
+    );
+  } else {
+    console.log(
+      "No smash64 match settings - this file is core-only (input-only) data.",
     );
   }
 
-  console.log(
-    `Result: ${gameEnd ? gameEnd.endReason : "unknown (truncated recording)"}`,
-  );
+  console.log("Players:");
+  for (const port of getSeatedPorts(replay)) {
+    const finalStocks = matchResult
+      ? humanStocks(matchResult.placements[port], true)
+      : "unknown (no smash64 result data)";
+    const extras: string[] = [];
+    let characterLabel = "";
+    if (matchSettings) {
+      if (matchSettings.teamsEnabled)
+        extras.push(`team ${matchSettings.portTeam[port]}`);
+      if (matchSettings.handicapMode !== "off")
+        extras.push(`handicap ${matchSettings.portHandicap[port]}`);
+      if (matchStart.slotType[port] === "cpu")
+        extras.push(`CPU level ${matchSettings.portCpuLevel[port]}`);
+      characterLabel = ` — ${characterName(matchSettings.characterId[port])}`;
+    }
+    console.log(
+      `  Port ${port + 1}: ${playerLabel(matchStart, port)}${characterLabel}` +
+        ` (${matchStart.slotType[port]})${extras.length ? ` [${extras.join(", ")}]` : ""}, final: ${finalStocks}`,
+    );
+  }
+
+  console.log(`Result: ${matchEnd.endReason}`);
   console.log(`Winner: ${determineWinner(replay)}`);
 }
 
@@ -157,5 +146,5 @@ if (files.length === 0) {
   process.exit(1);
 }
 for (const file of files) {
-  inspectFile(file);
+  await inspectFile(file);
 }

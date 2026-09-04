@@ -1,8 +1,8 @@
 # `@rmg-k/rmgr`
 
 A TypeScript reader/writer for RMG-K's `.rmgr` replay file format — per-match
-recordings of controller inputs and in-memory game state for
-_Super Smash Bros. (N64) — Smash Remix_.
+recordings of controller inputs, and (for a recognized game family) in-memory
+game state for _Super Smash Bros. (N64) — Smash Remix_.
 
 > This is an unofficial, fan-made project and is not affiliated with,
 > endorsed by, or sponsored by Nintendo. "Super Smash Bros." and other
@@ -12,6 +12,10 @@ _Super Smash Bros. (N64) — Smash Remix_.
 > under active early development and subject to change without notice.
 > Replay files created with the current version of RMG-K are not guaranteed
 > to keep working with future versions of this package, or vice versa.
+
+> **Format version 5 — a total break from anything this package read/wrote
+> before.** There is no migration path and none is planned; `parseReplay`
+> only reads version 5 files. See `docs/RMGR_SPEC.md` for the full story.
 
 The full on-disk format is documented in
 [`docs/RMGR_SPEC.md`](docs/RMGR_SPEC.md). This package is a faithful
@@ -44,22 +48,24 @@ import { readFile } from "node:fs/promises";
 import { parseReplay, getPortTimeline } from "@rmg-k/rmgr";
 
 const bytes = await readFile("2026-08-24-Alice-Bob.rmgr");
-const replay = parseReplay(new Uint8Array(bytes));
+const replay = await parseReplay(new Uint8Array(bytes)); // async - the event stream is zlib-compressed
 
-console.log(replay.gameStart.stageId, replay.gameStart.playerNames);
+console.log(replay.header.gameFamily, replay.matchStart.playerNames);
 console.log(`${replay.frames.length} frames recorded`);
-console.log(`recording finished cleanly: ${replay.isComplete}`);
 
 // Every frame port 0 was seated for, in order:
-for (const { frame, post } of getPortTimeline(replay, 0)) {
-  console.log(frame, post.actionStateId, post.damagePercent);
+for (const { frame, state } of getPortTimeline(replay, 0)) {
+  if (state) console.log(frame, state.actionStateId, state.damagePercent);
 }
 ```
 
+`state` is only present per-frame when `replay.header.gameFamily` is a
+recognized family (e.g. `"smash64"`) — a core-only file (an unrecognized
+game) only ever has `input`. Check `replay.matchSettings`/`replay.matchResult`
+(both `null` for a core-only file) before reading anything family-specific.
+
 For a fuller worked example — metadata, duration, per-player results, and
-winner determination (including a cross-check against the last recorded
-frame, since `GameEnd.placements` isn't always reliable for a port right at
-the KO/results-screen transition) — see
+winner determination — see
 [`examples/inspect-replay.ts`](examples/inspect-replay.ts):
 
 ```bash
@@ -71,12 +77,17 @@ Writing a file back out:
 
 ```ts
 import { writeFile } from "node:fs/promises";
-import { serializeReplay } from "@rmg-k/rmgr";
+import { serializeReplay, SMASH_64_FAMILY } from "@rmg-k/rmgr";
 
-const bytes = serializeReplay({
-  gameStart: replay.gameStart,
+const bytes = await serializeReplay({
+  gameFamily: SMASH_64_FAMILY,
+  goodName: replay.header.goodName,
+  recordedAtEpochMillis: replay.header.recordedAtEpochMillis,
+  matchStart: replay.matchStart,
+  matchSettings: replay.matchSettings,
   frames: replay.frames,
-  gameEnd: replay.gameEnd,
+  matchEnd: replay.matchEnd,
+  matchResult: replay.matchResult,
 });
 await writeFile("copy.rmgr", bytes);
 ```
@@ -92,37 +103,41 @@ to be explicit).
 ### Parsing
 
 ```ts
-function parseReplay(data: Uint8Array): Replay;
+function parseReplay(data: Uint8Array): Promise<Replay>;
 ```
 
-Parses a complete `.rmgr` file. Throws `ReplayParseError` for structurally
-invalid data (bad magic bytes, a missing `GameStart` event, an unrecognized
-event code with no declared size to skip by, or an unpaired
-`PreFrameUpdate`/`PostFrameUpdate`).
+Parses a complete `.rmgr` file. **Async** — the event stream is
+zlib-compressed (see `docs/RMGR_SPEC.md` §3.4), and decompression goes
+through the async Web Streams `DecompressionStream` API (available in Node
+18+ and every modern browser, no external dependency). Throws
+`ReplayParseError` for structurally invalid data (bad magic bytes, an
+unsupported version, a missing `MatchStart`/`MatchEnd`, a recognized
+`gameFamily` missing its `MatchSettings`/`MatchResult`, an unrecognized event
+code with no declared size to skip by, or an unpaired
+`InputFrame`/`StateFrame`).
 
-Tolerates a **truncated** file — one where the recording process crashed or
-was force-quit mid-match, so the header's `streamLength` was never patched
-from `0`. In that case parsing reads to end-of-buffer instead of trusting
-the header, `replay.gameEnd` comes back `null`, and `replay.isComplete` is
-`false`. This is not an error case — it's how you tell a genuinely short
-match apart from an interrupted recording.
+Unlike earlier format versions, a valid v5 file is always the complete
+output of a match that reached `MatchEnd` — the writer buffers the whole
+match in memory and only writes anything once, at match end. There's no
+"truncated recording" case to tolerate; a file that doesn't parse cleanly is
+corrupt, not a crash artifact.
 
 ### Serializing
 
 ```ts
-function serializeReplay(replay: SerializableReplay): Uint8Array;
+function serializeReplay(replay: SerializableReplay): Promise<Uint8Array>;
 ```
 
-Builds a complete `.rmgr` file in memory in one pass. `replay.frames` does
-not need to be pre-sorted. Omit `gameEnd` (or pass `null`) to produce a file
-with no `GameEnd` event — useful for constructing test fixtures that
-exercise the "truncated recording" path.
+Builds a complete `.rmgr` file in memory in one pass. **Async** for the
+mirror-image reason `parseReplay` is — compression via `CompressionStream`.
+`replay.frames` does not need to be pre-sorted.
 
-Unlike the streaming C++ writer (which has to write `streamLength: 0` and
-patch it in place later, for crash safety during a _live_ recording), this
-function always knows the true length up front and writes it directly.
-The two writers are wire-compatible: given the same logical data, they
-produce byte-identical files.
+Pass `gameFamily: SMASH_64_FAMILY` with `matchSettings`/`matchResult` to
+write a full `smash64`-family file; omit all three (or pass `gameFamily:
+""`) to write a core-only (game-agnostic) file, in which case every frame's
+`state`/`items`/`hazardFlags` are ignored — only `input` is ever written.
+Mismatching these (a `gameFamily` with no `matchSettings`, or vice versa)
+throws.
 
 ### Querying a parsed replay
 
@@ -145,14 +160,19 @@ its doc comments — read the spec for what each field actually means; the
 type names and JSDoc here are meant to save you a context switch, not
 replace it.
 
-- `Replay` — a fully parsed file: `header`, `gameStart`, `frames`,
-  `gameEnd`, `isComplete`.
+- `Replay` — a fully parsed file: `header`, `matchStart`, `matchSettings`
+  (`null` if core-only), `frames`, `matchEnd`, `matchResult` (`null` if
+  core-only).
 - `SerializableReplay` — the subset `serializeReplay` needs; you never
-  construct a `header` or compute `isComplete` yourself.
-- `GameStart`, `PortSettings`, `PreFrameUpdate`, `PostFrameUpdate`,
-  `GameEnd`, `Frame`, `FramePortData`.
+  construct a `header` yourself.
+- Core (always present): `MatchStart`, `InputFrame`, `MatchEnd`.
+- `smash64`-family extension (present only when recognized): `MatchSettings`,
+  `StateFrame`, `ItemUpdate`.
+- `Frame`, `FramePortData` (`input` always, `state` only for a recognized
+  family).
 - `PortIndex` (`0 | 1 | 2 | 3`), `SlotType` (`"human" | "cpu" | "empty"`),
-  `GameEndReason` (`"aborted" | "normal"`).
+  `GameEndReason` (`"aborted" | "normal"`), `HandicapMode`
+  (`"off" | "on" | "auto"`).
 
 ### Constants
 
@@ -163,13 +183,14 @@ import {
   EventCode,
   FORMAT_VERSION,
   MAGIC,
+  SMASH_64_FAMILY,
 } from "@rmg-k/rmgr";
 
-hasButton(preFrame.buttons, ButtonBit.A); // true if A is held
+hasButton(inputFrame.buttons, ButtonBit.A); // true if A is held
 ```
 
-`ButtonBit` has one entry per bit in `PreFrameUpdate.buttons` (see
-`docs/RMGR_SPEC.md` §7.4). `hasButton` checks all bits in its second
+`ButtonBit` has one entry per bit in `InputFrame.buttons` (see
+`docs/RMGR_SPEC.md` §8.4). `hasButton` checks all bits in its second
 argument are set, so it also works for combinations, e.g.
 `hasButton(buttons, ButtonBit.A | ButtonBit.L)`.
 
@@ -194,20 +215,22 @@ getCharacterName(CharacterId.Fox); // "Fox"
 getCharacterName(CharacterId.Fox, "ja"); // "フォックス"
 getStageName(StageId.DreamLand); // "Dream Land"
 getActionStateName(ActionStateId.CliffCatch); // "CliffCatch"
-isLedgeState(post.actionStateId); // true if in a ledge animation
+isLedgeState(state.actionStateId); // true if in a ledge animation
 ```
 
 ## Design notes
 
 - **No classes, no hidden state.** `parseReplay`/`serializeReplay` are pure
-  functions over plain, `readonly`-everywhere data — there's no `ReplayFile`
-  object wrapping a buffer with methods that secretly re-parse or mutate
-  anything. This is a deliberate departure from
+  (async) functions over plain, `readonly`-everywhere data — there's no
+  `ReplayFile` object wrapping a buffer with methods that secretly re-parse
+  or mutate anything. This is a deliberate departure from
   [`slippi-js`](https://github.com/project-slippi/slippi-js)'s `SlippiGame`
   class API; it's not required to look like it, and plain data is easier to
   test, diff, and reason about.
-- **`Uint8Array`/`DataView`, not `Buffer`.** Keeps the package portable to
-  non-Node runtimes with zero conditional code.
+- **`Uint8Array`/`DataView`, not `Buffer`; Web Streams, not a bundled zlib.**
+  Both choices keep the package portable to non-Node runtimes with zero
+  conditional code - `CompressionStream`/`DecompressionStream` are available
+  in Node 18+ and every modern browser.
 - **Strict TypeScript.** `strict`, `noUncheckedIndexedAccess`, and
   `exactOptionalPropertyTypes` are all on — see `tsconfig.json`.
 
@@ -227,23 +250,27 @@ Three kinds of coverage, deliberately not overlapping:
 - **`test/serialize.test.ts`** — cross-checks `serializeReplay`'s output
   against an independently hand-built buffer (plain `DataView` calls at
   offsets copied from `docs/RMGR_SPEC.md`, not from this package's own
-  code) for a fully-known fixture. This is the test that actually catches
+  code) for a fully-known fixture: the header exactly, and the compressed
+  event stream after decompressing it (deflate's compressed _encoding_
+  isn't part of the spec, only "zlib deflate" is - the decompressed content
+  is what's checked byte-for-byte). This is the test that actually catches
   "the writer and the spec disagree" — round-trip tests alone can't, since
   a bug shared by both the writer and reader would round-trip cleanly
   while still being wrong.
 - **`test/roundtrip.test.ts`** and **`test/parse.test.ts`** — round-trip
   fidelity across a range of shapes (multiple ports, missing/empty player
   names, negative values, out-of-order frames, zero frames, an
-  offline/CPU match, exact-width strings) and parser error handling
-  (bad magic, missing `GameStart`, an unrecognized event code with and
-  without a declared size to skip by, a truncated/`streamLength: 0` file,
-  and an unpaired `PreFrameUpdate`/`PostFrameUpdate`).
+  offline/CPU match, a core-only/unrecognized-family file, exact-width
+  strings) and parser error handling (bad magic, unsupported version,
+  missing `MatchStart`/`MatchEnd`, a recognized family missing its
+  `MatchSettings`/`MatchResult`, an unrecognized event code with and
+  without a declared size to skip by, and an unpaired
+  `InputFrame`/`StateFrame`).
 
 ## Acknowledgements
 
 The `.rmgr` file format itself — a self-describing binary event stream, with
-`PreFrameUpdate`/`PostFrameUpdate`/`GameEnd` events named and shaped after
-Slippi's own — is explicitly modeled on
+events named and shaped after Slippi's own — is explicitly modeled on
 [Project Slippi](https://github.com/project-slippi)'s `.slp` replay format
 for Super Smash Bros. Melee (see `docs/RMGR_SPEC.md` §1). It is not
 byte-compatible with `.slp`, and departs from it in several deliberate ways,
