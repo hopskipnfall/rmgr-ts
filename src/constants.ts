@@ -60,13 +60,28 @@ export const EVENT_PAYLOAD_SIZES: Readonly<Record<EventCode, number>> = {
   [EventCode.EventPayloads]: NaN, // self-describing; never looked up
   [EventCode.MatchStart]: 132,
   [EventCode.InputFrame]: 9,
-  [EventCode.StateFrame]: 50,
+  [EventCode.StateFrame]: 62,
   [EventCode.MatchEnd]: 5,
-  [EventCode.ItemUpdate]: 25,
+  [EventCode.ItemUpdate]: 33,
   [EventCode.StageHazardUpdate]: 5,
   [EventCode.MatchSettings]: 32,
   [EventCode.MatchResult]: 4,
 };
+
+/**
+ * `ItemUpdate`'s original payload size (recorder schema 1), ending after
+ * `positionZ`. Files declaring this size have no `scaleX`/`scaleY`; the
+ * writer also uses it for replays without scale data, so re-saving an old
+ * file never invents scale values.
+ */
+export const ITEM_UPDATE_SIZE_WITHOUT_SCALE = 25;
+
+/**
+ * `StateFrame`'s original payload size (recorder schema 1), ending after
+ * `comboDamage`. Files declaring this size have no `scaleX`/`scaleY`/
+ * `characterSpecific`; the writer also uses it for replays without them.
+ */
+export const STATE_FRAME_SIZE_SCHEMA_1 = 50;
 
 /** Controller button bits for `InputFrame.buttons`. */
 export const ButtonBit = {
