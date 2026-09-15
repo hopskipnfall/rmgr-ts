@@ -167,6 +167,10 @@ describe("serializeReplay -> parseReplay round trip", () => {
                     scaleX: 1.05,
                     scaleY: 1.05,
                     characterSpecific: 9, // Kirby holding Pikachu's ability
+                    shieldHealth: 42,
+                    specialHitStatus: 2, // respawn invincibility
+                    starHitStatus: 1,
+                    knockbackResist: 140,
                   },
                 }
               : data,
@@ -180,6 +184,10 @@ describe("serializeReplay -> parseReplay round trip", () => {
     expect(state?.scaleX).toBeCloseTo(1.05, 5);
     expect(state?.scaleY).toBeCloseTo(1.05, 5);
     expect(state?.characterSpecific).toBe(9);
+    expect(state?.shieldHealth).toBe(42);
+    expect(state?.specialHitStatus).toBe(2);
+    expect(state?.starHitStatus).toBe(1);
+    expect(state?.knockbackResist).toBeCloseTo(140, 5);
   });
 
   it("keeps replays without schema-2 state fields in the original 50-byte StateFrame layout, parsed without them", async () => {

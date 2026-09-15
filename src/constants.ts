@@ -60,7 +60,7 @@ export const EVENT_PAYLOAD_SIZES: Readonly<Record<EventCode, number>> = {
   [EventCode.EventPayloads]: NaN, // self-describing; never looked up
   [EventCode.MatchStart]: 132,
   [EventCode.InputFrame]: 9,
-  [EventCode.StateFrame]: 62,
+  [EventCode.StateFrame]: 72,
   [EventCode.MatchEnd]: 5,
   [EventCode.ItemUpdate]: 33,
   [EventCode.StageHazardUpdate]: 5,

@@ -109,7 +109,13 @@ export interface StateFrame {
   /** `jumpsMax` (per-character) minus the fighter's used-jump counter. `0` through most of a grounded match is normal (jumps reset on landing). */
   readonly jumpsRemaining: number;
   readonly grounded: boolean;
-  /** `0x03` = intangible/invincible. */
+  /**
+   * The motion-script hit status (`GMHitStatus`): `0` hurtboxes off, `1`
+   * normal, `2` invincible (can be hit, takes no damage/knockback), `3`
+   * intangible (can't be hit) - dodges, rolls and ledge-grab intangibility.
+   * Respawn and Star invincibility are separate: `specialHitStatus`,
+   * `starHitStatus`.
+   */
   readonly hurtboxState: number;
   /** Non-zero while in hitstun. */
   readonly hitstunCounter: number;
@@ -141,6 +147,22 @@ export interface StateFrame {
    * meaningful for other characters.
    */
   readonly characterSpecific?: number;
+  /** Shield health - recorder schema 2+. */
+  readonly shieldHealth?: number;
+  /**
+   * Hit status (values as `hurtboxState`) from the timed counters - recorder
+   * schema 2+. `2` during respawn invincibility, `3` during wall-bounce or
+   * while trapped in Yoshi's egg.
+   */
+  readonly specialHitStatus?: number;
+  /** Star item hit status - recorder schema 2+. `2` while Star-invincible. */
+  readonly starHitStatus?: number;
+  /**
+   * Temporary knockback armor (knockback units subtracted from incoming
+   * knockback) - recorder schema 2+. Nonzero only during Yoshi's double jump
+   * among the original 12; `0` = none.
+   */
+  readonly knockbackResist?: number;
 }
 
 /**

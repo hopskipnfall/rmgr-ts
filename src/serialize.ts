@@ -150,6 +150,10 @@ function writeStateFrame(
     w.writeF32(state.scaleX ?? 1);
     w.writeF32(state.scaleY ?? 1);
     w.writeI32(state.characterSpecific ?? 0);
+    w.writeI32(state.shieldHealth ?? 0);
+    w.writeU8(state.specialHitStatus ?? 1);
+    w.writeU8(state.starHitStatus ?? 1);
+    w.writeF32(state.knockbackResist ?? 0);
   }
 }
 
