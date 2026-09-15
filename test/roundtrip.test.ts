@@ -169,7 +169,6 @@ describe("serializeReplay -> parseReplay round trip", () => {
                     characterSpecific: 9, // Kirby holding Pikachu's ability
                     shieldHealth: 42,
                     specialHitStatus: 2, // respawn invincibility
-                    starHitStatus: 1,
                     knockbackResist: 140,
                   },
                 }
@@ -186,7 +185,6 @@ describe("serializeReplay -> parseReplay round trip", () => {
     expect(state?.characterSpecific).toBe(9);
     expect(state?.shieldHealth).toBe(42);
     expect(state?.specialHitStatus).toBe(2);
-    expect(state?.starHitStatus).toBe(1);
     expect(state?.knockbackResist).toBeCloseTo(140, 5);
   });
 

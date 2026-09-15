@@ -170,14 +170,13 @@ function parseStateFrame(
   const comboHitCount = reader.readU32();
   const comboDamage = reader.readU32();
   const extras =
-    declaredSize >= STATE_FRAME_SIZE_SCHEMA_1 + 22
+    declaredSize >= STATE_FRAME_SIZE_SCHEMA_1 + 21
       ? {
           scaleX: reader.readF32(),
           scaleY: reader.readF32(),
           characterSpecific: reader.readI32(),
           shieldHealth: reader.readI32(),
           specialHitStatus: reader.readU8(),
-          starHitStatus: reader.readU8(),
           knockbackResist: reader.readF32(),
         }
       : {};
