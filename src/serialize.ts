@@ -4,6 +4,8 @@ import {
   EVENT_PAYLOAD_SIZES,
   EventCode,
   FORMAT_VERSION,
+  ITEM_UPDATE_SIZE_WITHOUT_SCALE,
+  STATE_FRAME_SIZE_SCHEMA_1,
   GAME_FAMILY_WIDTH,
   GOOD_NAME_WIDTH,
   HEADER_SIZE,
@@ -48,7 +50,17 @@ const SMASH_64_EVENT_PAYLOADS_ENTRIES: ReadonlyArray<
   [EventCode.MatchResult, EVENT_PAYLOAD_SIZES[EventCode.MatchResult]],
 ];
 
-function writeEventPayloads(w: BinaryWriter, familyRecognized: boolean): void {
+/**
+ * Declares each event's size. `withItemScale`/`withStateExtras`: declare
+ * ItemUpdate's/StateFrame's full (schema 2+) size, or their original
+ * schema-1 size - see writeItemUpdate/writeStateFrame.
+ */
+function writeEventPayloads(
+  w: BinaryWriter,
+  familyRecognized: boolean,
+  withItemScale: boolean,
+  withStateExtras: boolean,
+): void {
   const entries = familyRecognized
     ? [...CORE_EVENT_PAYLOADS_ENTRIES, ...SMASH_64_EVENT_PAYLOADS_ENTRIES]
     : CORE_EVENT_PAYLOADS_ENTRIES;
@@ -56,7 +68,13 @@ function writeEventPayloads(w: BinaryWriter, familyRecognized: boolean): void {
   w.writeU8(entries.length);
   for (const [code, size] of entries) {
     w.writeU8(code);
-    w.writeU16(size);
+    if (code === EventCode.ItemUpdate && !withItemScale) {
+      w.writeU16(ITEM_UPDATE_SIZE_WITHOUT_SCALE);
+    } else if (code === EventCode.StateFrame && !withStateExtras) {
+      w.writeU16(STATE_FRAME_SIZE_SCHEMA_1);
+    } else {
+      w.writeU16(size);
+    }
   }
 }
 
@@ -102,7 +120,11 @@ function writeInputFrame(
   w.writeI8(input.stickY);
 }
 
-function writeStateFrame(w: BinaryWriter, state: StateFrame): void {
+function writeStateFrame(
+  w: BinaryWriter,
+  state: StateFrame,
+  withExtras: boolean,
+): void {
   w.writeU8(EventCode.StateFrame);
   w.writeI32(state.frame);
   w.writeU8(state.port);
@@ -122,9 +144,29 @@ function writeStateFrame(w: BinaryWriter, state: StateFrame): void {
   w.writeU32(state.actionFrameCounter);
   w.writeU32(state.comboHitCount);
   w.writeU32(state.comboDamage);
+  // Schema-2 trailing fields - only when writeEventPayloads declared them
+  // (see withStateExtras in serializeReplay).
+  if (withExtras) {
+    w.writeF32(state.scaleX ?? 1);
+    w.writeF32(state.scaleY ?? 1);
+    w.writeI32(state.characterSpecific ?? 0);
+    w.writeI32(state.shieldHealth ?? 0);
+    w.writeU8(state.specialHitStatus ?? 1);
+    w.writeF32(state.knockbackResist ?? 0);
+  }
 }
 
-function writeItemUpdate(w: BinaryWriter, item: ItemUpdate): void {
+/**
+ * `withScale` must match what writeEventPayloads declared. A replay whose
+ * items carry no scale (every file from recorder schema 1) is written in the
+ * original 25-byte layout, so re-saving an old file never invents scale
+ * values; `1` only fills a gap if some items in a scaled replay lack it.
+ */
+function writeItemUpdate(
+  w: BinaryWriter,
+  item: ItemUpdate,
+  withScale: boolean,
+): void {
   w.writeU8(EventCode.ItemUpdate);
   w.writeI32(item.frame);
   w.writeU32(item.objectAddress);
@@ -133,6 +175,10 @@ function writeItemUpdate(w: BinaryWriter, item: ItemUpdate): void {
   w.writeF32(item.positionX);
   w.writeF32(item.positionY);
   w.writeF32(item.positionZ);
+  if (withScale) {
+    w.writeF32(item.scaleX ?? 1);
+    w.writeF32(item.scaleY ?? 1);
+  }
 }
 
 function writeStageHazardUpdate(
@@ -197,7 +243,28 @@ export async function serializeReplay(
 
   const eventStream = new BinaryWriter();
 
-  writeEventPayloads(eventStream, familyRecognized);
+  const withItemScale = replay.frames.some((frame) =>
+    (frame.items ?? []).some(
+      (item) => item.scaleX !== undefined && item.scaleY !== undefined,
+    ),
+  );
+  // A replay whose states carry none of the schema-2 fields (every file from
+  // recorder schema 1) keeps the original 50-byte StateFrame layout, so
+  // re-saving an old file never invents values.
+  const withStateExtras = replay.frames.some((frame) =>
+    Object.values(frame.ports).some(
+      (portData) =>
+        portData?.state?.scaleX !== undefined &&
+        portData.state.scaleY !== undefined &&
+        portData.state.characterSpecific !== undefined,
+    ),
+  );
+  writeEventPayloads(
+    eventStream,
+    familyRecognized,
+    withItemScale,
+    withStateExtras,
+  );
   writeMatchStart(eventStream, replay.matchStart);
   if (familyRecognized && replay.matchSettings) {
     writeMatchSettings(eventStream, replay.matchSettings);
@@ -212,12 +279,12 @@ export async function serializeReplay(
       }
       writeInputFrame(eventStream, frame.frame, port, portData.input);
       if (familyRecognized && portData.state) {
-        writeStateFrame(eventStream, portData.state);
+        writeStateFrame(eventStream, portData.state, withStateExtras);
       }
     }
     if (familyRecognized) {
       for (const item of frame.items ?? []) {
-        writeItemUpdate(eventStream, item);
+        writeItemUpdate(eventStream, item, withItemScale);
       }
       if (frame.hazardFlags) {
         writeStageHazardUpdate(eventStream, frame.frame, frame.hazardFlags);

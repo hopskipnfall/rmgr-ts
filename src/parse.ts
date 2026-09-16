@@ -3,6 +3,8 @@ import { inflate } from "./compression.js";
 import {
   EventCode,
   FORMAT_VERSION,
+  ITEM_UPDATE_SIZE_WITHOUT_SCALE,
+  STATE_FRAME_SIZE_SCHEMA_1,
   GAME_FAMILY_WIDTH,
   GOOD_NAME_WIDTH,
   HEADER_SIZE,
@@ -137,7 +139,15 @@ function parseInputFrame(reader: BinaryReader): InputFrame {
   return { frame, port, buttons, stickX, stickY };
 }
 
-function parseStateFrame(reader: BinaryReader): StateFrame {
+/**
+ * `declaredSize` is this file's own EventPayloads size for StateFrame: the
+ * trailing scaleX/scaleY/characterSpecific (recorder schema 2+) are only read
+ * when it includes them, so schema-1 files (50 bytes) parse exactly as before.
+ */
+function parseStateFrame(
+  reader: BinaryReader,
+  declaredSize: number = STATE_FRAME_SIZE_SCHEMA_1,
+): StateFrame {
   const frame = reader.readI32();
   const port = reader.readU8() as PortIndex;
   const characterId = reader.readU8();
@@ -159,6 +169,17 @@ function parseStateFrame(reader: BinaryReader): StateFrame {
   const actionFrameCounter = reader.readU32();
   const comboHitCount = reader.readU32();
   const comboDamage = reader.readU32();
+  const extras =
+    declaredSize >= STATE_FRAME_SIZE_SCHEMA_1 + 21
+      ? {
+          scaleX: reader.readF32(),
+          scaleY: reader.readF32(),
+          characterSpecific: reader.readI32(),
+          shieldHealth: reader.readI32(),
+          specialHitStatus: reader.readU8(),
+          knockbackResist: reader.readF32(),
+        }
+      : {};
 
   return {
     frame,
@@ -179,6 +200,7 @@ function parseStateFrame(reader: BinaryReader): StateFrame {
     actionFrameCounter,
     comboHitCount,
     comboDamage,
+    ...extras,
   };
 }
 
@@ -193,7 +215,15 @@ function parseMatchResult(reader: BinaryReader): MatchResult {
   return { placements };
 }
 
-function parseItemUpdate(reader: BinaryReader): ItemUpdate {
+/**
+ * `declaredSize` is this file's own EventPayloads size for ItemUpdate: the
+ * trailing scaleX/scaleY (recorder schema 2+) are only read when it includes
+ * them, so schema-1 files (25 bytes) parse exactly as before, with no scale.
+ */
+function parseItemUpdate(
+  reader: BinaryReader,
+  declaredSize: number,
+): ItemUpdate {
   const frame = reader.readI32();
   const objectAddress = reader.readU32();
   const linkId = reader.readU8();
@@ -201,7 +231,7 @@ function parseItemUpdate(reader: BinaryReader): ItemUpdate {
   const positionX = reader.readF32();
   const positionY = reader.readF32();
   const positionZ = reader.readF32();
-  return {
+  const item: ItemUpdate = {
     frame,
     objectAddress,
     linkId,
@@ -210,6 +240,10 @@ function parseItemUpdate(reader: BinaryReader): ItemUpdate {
     positionY,
     positionZ,
   };
+  if (declaredSize < ITEM_UPDATE_SIZE_WITHOUT_SCALE + 8) return item;
+  const scaleX = reader.readF32();
+  const scaleY = reader.readF32();
+  return { ...item, scaleX, scaleY };
 }
 
 function parseStageHazardUpdate(reader: BinaryReader): {
@@ -380,14 +414,13 @@ export async function parseReplay(data: Uint8Array): Promise<Replay> {
         break;
       }
       case EventCode.StateFrame: {
-        const state = readKnownPayload(
-          reader,
-          requireDeclaredSize(
-            declaredSizes,
-            EventCode.StateFrame,
-            "StateFrame",
-          ),
-          parseStateFrame,
+        const stateFrameSize = requireDeclaredSize(
+          declaredSizes,
+          EventCode.StateFrame,
+          "StateFrame",
+        );
+        const state = readKnownPayload(reader, stateFrameSize, (r) =>
+          parseStateFrame(r, stateFrameSize),
         );
         entryFor(state.frame, state.port).state = state;
         break;
@@ -411,14 +444,13 @@ export async function parseReplay(data: Uint8Array): Promise<Replay> {
         );
         break;
       case EventCode.ItemUpdate: {
-        const item = readKnownPayload(
-          reader,
-          requireDeclaredSize(
-            declaredSizes,
-            EventCode.ItemUpdate,
-            "ItemUpdate",
-          ),
-          parseItemUpdate,
+        const itemUpdateSize = requireDeclaredSize(
+          declaredSizes,
+          EventCode.ItemUpdate,
+          "ItemUpdate",
+        );
+        const item = readKnownPayload(reader, itemUpdateSize, (r) =>
+          parseItemUpdate(r, itemUpdateSize),
         );
         let items = itemsByFrame.get(item.frame);
         if (!items) {

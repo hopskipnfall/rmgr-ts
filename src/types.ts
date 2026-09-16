@@ -109,7 +109,13 @@ export interface StateFrame {
   /** `jumpsMax` (per-character) minus the fighter's used-jump counter. `0` through most of a grounded match is normal (jumps reset on landing). */
   readonly jumpsRemaining: number;
   readonly grounded: boolean;
-  /** `0x03` = intangible/invincible. */
+  /**
+   * The motion-script hit status (`GMHitStatus`): `0` hurtboxes off, `1`
+   * normal, `2` invincible (can be hit, takes no damage/knockback), `3`
+   * intangible (can't be hit) - dodges, rolls and ledge-grab intangibility.
+   * Respawn invincibility is separate: `specialHitStatus`. Super Star item
+   * invincibility isn't recorded.
+   */
   readonly hurtboxState: number;
   /** Non-zero while in hitstun. */
   readonly hitstunCounter: number;
@@ -125,6 +131,36 @@ export interface StateFrame {
   readonly comboHitCount: number;
   /** Running damage dealt within the same chain as `comboHitCount`; zeroes at the same instant. */
   readonly comboDamage: number;
+  /**
+   * The fighter's render scale (root joint scale x/y) - recorder schema 2+;
+   * absent for files whose `StateFrame` is the original 50-byte layout. `1.0`
+   * x Remix's Giant/Tiny setting normally, `0` if the recorder couldn't read
+   * it. Remix also derives the ECB and ledge-grab reach from this size, and
+   * Kirby's aerial up-B can leave it stuck above 1.0 until he respawns.
+   */
+  readonly scaleX?: number;
+  readonly scaleY?: number;
+  /**
+   * Per-character hidden state - recorder schema 2+ (docs/RMGR_SPEC.md §5.2).
+   * Samus: stored Charge Shot level 0-7. DK: stored Giant Punch charge
+   * 0-10. Kirby: copied fighter's character ID, `8` (Kirby) = none. Not
+   * meaningful for other characters.
+   */
+  readonly characterSpecific?: number;
+  /** Shield health - recorder schema 2+. */
+  readonly shieldHealth?: number;
+  /**
+   * Hit status (values as `hurtboxState`) from the timed counters - recorder
+   * schema 2+. `2` during respawn invincibility, `3` during wall-bounce or
+   * while trapped in Yoshi's egg.
+   */
+  readonly specialHitStatus?: number;
+  /**
+   * Temporary knockback armor (knockback units subtracted from incoming
+   * knockback) - recorder schema 2+. Nonzero only during Yoshi's double jump
+   * among the original 12; `0` = none.
+   */
+  readonly knockbackResist?: number;
 }
 
 /**
@@ -162,6 +198,14 @@ export interface ItemUpdate {
   readonly positionX: number;
   readonly positionY: number;
   readonly positionZ: number;
+  /**
+   * The object's render scale (its DObj's scale x/y) - recorder schema 2+.
+   * Absent for files whose `ItemUpdate` is the original 25-byte layout
+   * (recorder schema 1). Constant for most objects; Samus's Charge Shot grows
+   * with charge, `gfx_size / 30` per charge level (docs/RMGR_SPEC.md §5.3).
+   */
+  readonly scaleX?: number;
+  readonly scaleY?: number;
 }
 
 /**

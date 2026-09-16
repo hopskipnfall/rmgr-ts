@@ -118,6 +118,86 @@ describe("serializeReplay -> parseReplay round trip", () => {
     expect(parsed.frames[1]?.items).toEqual([]);
   });
 
+  it("round-trips ItemUpdate render scale (recorder schema 2+)", async () => {
+    const items0 = [
+      makeItemUpdate({
+        frame: 0,
+        kind: 0x02, // WPKind.ChargeShot
+        scaleX: 700 / 30,
+        scaleY: 700 / 30,
+      }),
+    ];
+    const input = makeReplay({
+      frames: [makeFrame(0, [0, 1], items0), makeFrame(1, [0, 1])],
+    });
+    const parsed = await parseReplay(await serializeReplay(input));
+
+    expect(parsed.frames[0]?.items?.[0]?.scaleX).toBeCloseTo(700 / 30, 4);
+    expect(parsed.frames[0]?.items?.[0]?.scaleY).toBeCloseTo(700 / 30, 4);
+  });
+
+  it("keeps replays without item scale in the original 25-byte ItemUpdate layout, parsed with no scale", async () => {
+    // Every file from recorder schema 1: re-saving one must not invent scale
+    // values, and parsing it must leave scaleX/scaleY absent.
+    const items0 = [makeItemUpdate({ frame: 0, kind: 0x02 })];
+    const input = makeReplay({
+      frames: [makeFrame(0, [0, 1], items0), makeFrame(1, [0, 1])],
+    });
+    const parsed = await parseReplay(await serializeReplay(input));
+
+    expect(parsed.frames[0]?.items).toEqual(items0);
+    expect(parsed.frames[0]?.items?.[0]).not.toHaveProperty("scaleX");
+    expect(parsed.frames[0]?.items?.[0]).not.toHaveProperty("scaleY");
+  });
+
+  it("round-trips StateFrame scale and characterSpecific (recorder schema 2+)", async () => {
+    const base = makeReplay();
+    const input = {
+      ...base,
+      frames: base.frames.map((frame) => ({
+        ...frame,
+        ports: Object.fromEntries(
+          Object.entries(frame.ports).map(([port, data]) => [
+            port,
+            data?.state
+              ? {
+                  ...data,
+                  state: {
+                    ...data.state,
+                    scaleX: 1.05,
+                    scaleY: 1.05,
+                    characterSpecific: 9, // Kirby holding Pikachu's ability
+                    shieldHealth: 42,
+                    specialHitStatus: 2, // respawn invincibility
+                    knockbackResist: 140,
+                  },
+                }
+              : data,
+          ]),
+        ) as typeof frame.ports,
+      })),
+    };
+    const parsed = await parseReplay(await serializeReplay(input));
+    const state = parsed.frames[0]?.ports[0]?.state;
+
+    expect(state?.scaleX).toBeCloseTo(1.05, 5);
+    expect(state?.scaleY).toBeCloseTo(1.05, 5);
+    expect(state?.characterSpecific).toBe(9);
+    expect(state?.shieldHealth).toBe(42);
+    expect(state?.specialHitStatus).toBe(2);
+    expect(state?.knockbackResist).toBeCloseTo(140, 5);
+  });
+
+  it("keeps replays without schema-2 state fields in the original 50-byte StateFrame layout, parsed without them", async () => {
+    const input = makeReplay();
+    const parsed = await parseReplay(await serializeReplay(input));
+    const state = parsed.frames[0]?.ports[0]?.state;
+
+    expect(state).toEqual(input.frames[0]?.ports[0]?.state);
+    expect(state).not.toHaveProperty("scaleX");
+    expect(state).not.toHaveProperty("characterSpecific");
+  });
+
   it("round-trips StageHazardUpdate.hazardFlags, omitting the event on frames where it's 0", async () => {
     const input = makeReplay({
       frames: [
