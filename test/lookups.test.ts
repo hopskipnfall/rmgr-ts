@@ -6,6 +6,7 @@ import {
   getCharacterGroup,
   getCharacterName,
   getGameDefinitions,
+  getRemixSettingValueName,
   getStageName,
   GoodName,
   isFoxCharacter,
@@ -193,6 +194,23 @@ describe("Action state lookups", () => {
     expect(isLedgeState(ActionStateId.CliffEscapeSlow)).toBe(true);
     expect(isLedgeState(ActionStateId.CliffEscapeSlow2)).toBe(true);
     expect(isLedgeState(ActionStateId.Fall)).toBe(false);
+  });
+});
+
+describe("Remix Gameplay/Stage Setting lookups", () => {
+  it("resolves gameplay and stage setting value names", () => {
+    expect(getRemixSettingValueName("hitlag", 2)).toBe("Melee");
+    expect(getRemixSettingValueName("zCancel", 3)).toBe("Auto");
+    expect(getRemixSettingValueName("gameSpeed", 6)).toBe("3.0x");
+    expect(getRemixSettingValueName("hazardMode", 1)).toBe("Hazards Off");
+    expect(getRemixSettingValueName("cameraMode", 3)).toBe("Scene");
+  });
+
+  it("falls back to a bare-number placeholder for an out-of-range value or unknown field", () => {
+    expect(getRemixSettingValueName("hitstun", 9)).toBe("hitstun 9");
+    expect(getRemixSettingValueName("notARealField", 0)).toBe(
+      "notARealField 0",
+    );
   });
 });
 

@@ -64,7 +64,7 @@ export const EVENT_PAYLOAD_SIZES: Readonly<Record<EventCode, number>> = {
   [EventCode.MatchEnd]: 5,
   [EventCode.ItemUpdate]: 33,
   [EventCode.StageHazardUpdate]: 5,
-  [EventCode.MatchSettings]: 32,
+  [EventCode.MatchSettings]: 75,
   [EventCode.MatchResult]: 4,
 };
 
@@ -82,6 +82,14 @@ export const ITEM_UPDATE_SIZE_WITHOUT_SCALE = 25;
  * `characterSpecific`; the writer also uses it for replays without them.
  */
 export const STATE_FRAME_SIZE_SCHEMA_1 = 50;
+
+/**
+ * `MatchSettings`'s original payload size (recorder schema 1/2), ending
+ * after `portCpuLevel`. Files declaring this size have no `rngSeed` or
+ * Remix `Toggles.asm` settings (recorder schema 3+ only); the writer also
+ * uses it for replays without them.
+ */
+export const MATCH_SETTINGS_SIZE_WITHOUT_REMIX_SETTINGS = 32;
 
 /** Controller button bits for `InputFrame.buttons`. */
 export const ButtonBit = {

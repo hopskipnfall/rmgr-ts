@@ -198,6 +198,76 @@ describe("serializeReplay -> parseReplay round trip", () => {
     expect(state).not.toHaveProperty("characterSpecific");
   });
 
+  it("round-trips MatchSettings rngSeed/gameplaySettings/stageSettings (recorder schema 3+)", async () => {
+    const input = makeReplay({
+      matchSettings: makeMatchSettings({
+        rngSeed: -123456789,
+        gameplaySettings: {
+          hitstun: 1, // Melee
+          hitlag: 2, // Melee
+          di: 0,
+          japaneseSounds: 0,
+          japaneseStunSleep: 0,
+          momentumSlide: 0,
+          shieldStun: 0,
+          zCancel: 3, // Auto
+          punishFailedZCancel: 0,
+          improvedAI: 0,
+          tripping: 0,
+          rage: 1, // Ultimate
+          footstoolJumping: 0,
+          airDodging: 0,
+          jabLocking: 0,
+          edgeCJumping: 0,
+          perfectShielding: 0,
+          parrying: 0,
+          spotDodging: 0,
+          fastFallAerials: 0,
+          ledgeTrumping: 0,
+          wallTeching: 0,
+          chargeSmashes: 0,
+          itemContainers: 0,
+          gameSpeed: 0,
+          specialZoom: 0,
+          blastzoneWarp: 0,
+          singleButtonMode: 0,
+          allItemsRDropAerial: 0,
+          moveStaling: 0,
+          stopwatchItem: 0,
+        },
+        stageSettings: {
+          stageSelectLayout: 0,
+          hazardMode: 1, // Hazards Off
+          whispyMode: 0,
+          saffronPokemonRate: 0,
+          pokemonAnnouncer: 0,
+          dragonKingHUD: 0,
+          cameraMode: 0,
+          yoshiIslandCloudAnims: 1,
+        },
+      }),
+    });
+    const parsed = await parseReplay(await serializeReplay(input));
+
+    expect(parsed.matchSettings?.rngSeed).toBe(-123456789);
+    expect(parsed.matchSettings?.gameplaySettings).toEqual(
+      input.matchSettings?.gameplaySettings,
+    );
+    expect(parsed.matchSettings?.stageSettings).toEqual(
+      input.matchSettings?.stageSettings,
+    );
+  });
+
+  it("keeps replays without schema-3 settings in the original 32-byte MatchSettings layout, parsed without them", async () => {
+    const input = makeReplay();
+    const parsed = await parseReplay(await serializeReplay(input));
+
+    expect(parsed.matchSettings).toEqual(input.matchSettings);
+    expect(parsed.matchSettings).not.toHaveProperty("rngSeed");
+    expect(parsed.matchSettings).not.toHaveProperty("gameplaySettings");
+    expect(parsed.matchSettings).not.toHaveProperty("stageSettings");
+  });
+
   it("round-trips StageHazardUpdate.hazardFlags, omitting the event on frames where it's 0", async () => {
     const input = makeReplay({
       frames: [

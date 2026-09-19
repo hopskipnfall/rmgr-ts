@@ -36,6 +36,7 @@ export {
   getCharacterName,
   getGameDefinitions,
   getItemKindName,
+  getRemixSettingValueName,
   getStageName,
   isFoxCharacter,
   isGrabState,
@@ -56,6 +57,7 @@ export type {
   GameDefinitions,
   Language,
   LookupOptions,
+  RemixSettingField,
 } from "./lookups.js";
 
 export type {
@@ -70,6 +72,8 @@ export type {
   MatchSettings,
   MatchStart,
   PortIndex,
+  RemixGameplaySettings,
+  RemixStageSettings,
   Replay,
   ReplayHeader,
   SerializableReplay,

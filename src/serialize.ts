@@ -5,6 +5,7 @@ import {
   EventCode,
   FORMAT_VERSION,
   ITEM_UPDATE_SIZE_WITHOUT_SCALE,
+  MATCH_SETTINGS_SIZE_WITHOUT_REMIX_SETTINGS,
   STATE_FRAME_SIZE_SCHEMA_1,
   GAME_FAMILY_WIDTH,
   GOOD_NAME_WIDTH,
@@ -53,13 +54,16 @@ const SMASH_64_EVENT_PAYLOADS_ENTRIES: ReadonlyArray<
 /**
  * Declares each event's size. `withItemScale`/`withStateExtras`: declare
  * ItemUpdate's/StateFrame's full (schema 2+) size, or their original
- * schema-1 size - see writeItemUpdate/writeStateFrame.
+ * schema-1 size - see writeItemUpdate/writeStateFrame. `withRemixSettings`:
+ * same idea for MatchSettings's schema-3 rngSeed/gameplaySettings/
+ * stageSettings - see writeMatchSettings.
  */
 function writeEventPayloads(
   w: BinaryWriter,
   familyRecognized: boolean,
   withItemScale: boolean,
   withStateExtras: boolean,
+  withRemixSettings: boolean,
 ): void {
   const entries = familyRecognized
     ? [...CORE_EVENT_PAYLOADS_ENTRIES, ...SMASH_64_EVENT_PAYLOADS_ENTRIES]
@@ -72,6 +76,8 @@ function writeEventPayloads(
       w.writeU16(ITEM_UPDATE_SIZE_WITHOUT_SCALE);
     } else if (code === EventCode.StateFrame && !withStateExtras) {
       w.writeU16(STATE_FRAME_SIZE_SCHEMA_1);
+    } else if (code === EventCode.MatchSettings && !withRemixSettings) {
+      w.writeU16(MATCH_SETTINGS_SIZE_WITHOUT_REMIX_SETTINGS);
     } else {
       w.writeU16(size);
     }
@@ -88,7 +94,18 @@ function writeMatchStart(w: BinaryWriter, matchStart: MatchStart): void {
   }
 }
 
-function writeMatchSettings(w: BinaryWriter, settings: MatchSettings): void {
+/**
+ * `withRemixSettings` must match what writeEventPayloads declared. A
+ * replay whose settings carry no rngSeed/gameplaySettings/stageSettings
+ * (every file from recorder schema 1/2) is written in the original 32-byte
+ * layout, so re-saving an old file never invents them; `0` only fills a
+ * gap if a schema-3 replay is somehow missing one of these fields.
+ */
+function writeMatchSettings(
+  w: BinaryWriter,
+  settings: MatchSettings,
+  withRemixSettings: boolean,
+): void {
   w.writeU8(EventCode.MatchSettings);
   w.writeU8(settings.stageId);
   w.writeU8(settings.gameType);
@@ -104,6 +121,50 @@ function writeMatchSettings(w: BinaryWriter, settings: MatchSettings): void {
   for (const v of settings.portTeam) w.writeU8(v);
   for (const v of settings.portHandicap) w.writeU8(v);
   for (const v of settings.portCpuLevel) w.writeU8(v);
+  if (!withRemixSettings) return;
+
+  w.writeI32(settings.rngSeed ?? 0);
+  const gp = settings.gameplaySettings;
+  w.writeU8(gp?.hitstun ?? 0);
+  w.writeU8(gp?.hitlag ?? 0);
+  w.writeU8(gp?.di ?? 0);
+  w.writeU8(gp?.japaneseSounds ?? 0);
+  w.writeU8(gp?.japaneseStunSleep ?? 0);
+  w.writeU8(gp?.momentumSlide ?? 0);
+  w.writeU8(gp?.shieldStun ?? 0);
+  w.writeU8(gp?.zCancel ?? 0);
+  w.writeU8(gp?.punishFailedZCancel ?? 0);
+  w.writeU8(gp?.improvedAI ?? 0);
+  w.writeU8(gp?.tripping ?? 0);
+  w.writeU8(gp?.rage ?? 0);
+  w.writeU8(gp?.footstoolJumping ?? 0);
+  w.writeU8(gp?.airDodging ?? 0);
+  w.writeU8(gp?.jabLocking ?? 0);
+  w.writeU8(gp?.edgeCJumping ?? 0);
+  w.writeU8(gp?.perfectShielding ?? 0);
+  w.writeU8(gp?.parrying ?? 0);
+  w.writeU8(gp?.spotDodging ?? 0);
+  w.writeU8(gp?.fastFallAerials ?? 0);
+  w.writeU8(gp?.ledgeTrumping ?? 0);
+  w.writeU8(gp?.wallTeching ?? 0);
+  w.writeU8(gp?.chargeSmashes ?? 0);
+  w.writeU8(gp?.itemContainers ?? 0);
+  w.writeU8(gp?.gameSpeed ?? 0);
+  w.writeU8(gp?.specialZoom ?? 0);
+  w.writeU8(gp?.blastzoneWarp ?? 0);
+  w.writeU8(gp?.singleButtonMode ?? 0);
+  w.writeU8(gp?.allItemsRDropAerial ?? 0);
+  w.writeU8(gp?.moveStaling ?? 0);
+  w.writeU8(gp?.stopwatchItem ?? 0);
+  const sp = settings.stageSettings;
+  w.writeU8(sp?.stageSelectLayout ?? 0);
+  w.writeU8(sp?.hazardMode ?? 0);
+  w.writeU8(sp?.whispyMode ?? 0);
+  w.writeU8(sp?.saffronPokemonRate ?? 0);
+  w.writeU8(sp?.pokemonAnnouncer ?? 0);
+  w.writeU8(sp?.dragonKingHUD ?? 0);
+  w.writeU8(sp?.cameraMode ?? 0);
+  w.writeU8(sp?.yoshiIslandCloudAnims ?? 0);
 }
 
 function writeInputFrame(
@@ -259,15 +320,23 @@ export async function serializeReplay(
         portData.state.characterSpecific !== undefined,
     ),
   );
+  // A replay whose settings carry none of the schema-3 fields (every file
+  // from recorder schema 1/2) keeps the original 32-byte MatchSettings
+  // layout, so re-saving an old file never invents values.
+  const withRemixSettings =
+    replay.matchSettings?.rngSeed !== undefined &&
+    replay.matchSettings.gameplaySettings !== undefined &&
+    replay.matchSettings.stageSettings !== undefined;
   writeEventPayloads(
     eventStream,
     familyRecognized,
     withItemScale,
     withStateExtras,
+    withRemixSettings,
   );
   writeMatchStart(eventStream, replay.matchStart);
   if (familyRecognized && replay.matchSettings) {
-    writeMatchSettings(eventStream, replay.matchSettings);
+    writeMatchSettings(eventStream, replay.matchSettings, withRemixSettings);
   }
 
   const sortedFrames = [...replay.frames].sort((a, b) => a.frame - b.frame);
