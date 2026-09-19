@@ -69,6 +69,83 @@ export interface MatchSettings {
   readonly portHandicap: readonly [number, number, number, number];
   /** Meaningless for a `"human"` port. */
   readonly portCpuLevel: readonly [number, number, number, number];
+  /**
+   * Recorder schema 3+ (absent for schema 1/2 files, whose `MatchSettings`
+   * is 32 bytes and ends after `portCpuLevel`). `sSYUtilsRandomSeed`
+   * (vanilla SSB64 code, unmodified by Remix) captured once at match
+   * start. Paired with this match's recorded `InputFrame` events, it's
+   * sufficient to reproduce this match's RNG-dependent outcomes (item
+   * spawn rolls, move variance, Whispy Woods' wind timing, ...) when
+   * replaying from inputs - see `docs/RMGR_SPEC.md` §5.1.
+   */
+  readonly rngSeed?: number;
+  /**
+   * Remix's `Toggles.asm` menu-configured mutators - match properties
+   * captured once alongside the rest of `MatchSettings`, not per-frame
+   * data. Recorder schema 3+ (absent for schema 1/2 files). Every value
+   * is a raw enum/flag number - see `RemixGameplaySettingValue`/
+   * `RemixStageSettingValue` and `getRemixSettingValueName()` in
+   * `lookups.ts` for what each value means, and `docs/RMGR_SPEC.md`
+   * §5.1.1/§5.1.2 for the source tables.
+   */
+  readonly gameplaySettings?: RemixGameplaySettings;
+  /** See `gameplaySettings`. Recorder schema 3+ (absent for schema 1/2 files). */
+  readonly stageSettings?: RemixStageSettings;
+}
+
+/**
+ * The 31 Gameplay Settings from Remix's `Toggles.asm` - `MatchSettings`
+ * recorder schema 3+. Field order matches the wire layout
+ * (`docs/RMGR_SPEC.md` §5.1); every value is a raw enum/flag number - see
+ * `getRemixSettingValueName()` in `lookups.ts` for what each value means.
+ */
+export interface RemixGameplaySettings {
+  readonly hitstun: number;
+  readonly hitlag: number;
+  readonly di: number;
+  readonly japaneseSounds: number;
+  readonly japaneseStunSleep: number;
+  readonly momentumSlide: number;
+  readonly shieldStun: number;
+  readonly zCancel: number;
+  readonly punishFailedZCancel: number;
+  readonly improvedAI: number;
+  readonly tripping: number;
+  readonly rage: number;
+  readonly footstoolJumping: number;
+  readonly airDodging: number;
+  readonly jabLocking: number;
+  readonly edgeCJumping: number;
+  readonly perfectShielding: number;
+  readonly parrying: number;
+  readonly spotDodging: number;
+  readonly fastFallAerials: number;
+  readonly ledgeTrumping: number;
+  readonly wallTeching: number;
+  readonly chargeSmashes: number;
+  readonly itemContainers: number;
+  readonly gameSpeed: number;
+  readonly specialZoom: number;
+  readonly blastzoneWarp: number;
+  readonly singleButtonMode: number;
+  readonly allItemsRDropAerial: number;
+  readonly moveStaling: number;
+  readonly stopwatchItem: number;
+}
+
+/**
+ * The 8 (core) Stage Settings from Remix's `Toggles.asm` - `MatchSettings`
+ * recorder schema 3+. See `RemixGameplaySettings`'s doc comment.
+ */
+export interface RemixStageSettings {
+  readonly stageSelectLayout: number;
+  readonly hazardMode: number;
+  readonly whispyMode: number;
+  readonly saffronPokemonRate: number;
+  readonly pokemonAnnouncer: number;
+  readonly dragonKingHUD: number;
+  readonly cameraMode: number;
+  readonly yoshiIslandCloudAnims: number;
 }
 
 /**

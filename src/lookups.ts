@@ -1288,3 +1288,132 @@ export function getItemKindName(linkId: number, kind: number): string {
   }
   return `Unknown (linkId 0x${linkId.toString(16)}, kind 0x${kind.toString(16)})`;
 }
+
+// ---------------------------------------------------------------------------
+// Remix Toggles.asm Gameplay/Stage Settings (MatchSettings, recorder schema
+// 3+ - docs/RMGR_SPEC.md sections 5.1.1/5.1.2). Values verified directly
+// against the Smash Remix 2.0.1 source build. SmashRemix2.0.1-specific, like
+// the item/weapon kinds above - not routed through GameDefinitions.
+// ---------------------------------------------------------------------------
+
+/** `RemixGameplaySettings`/`RemixStageSettings` field names - the keys `getRemixSettingValueName()` accepts. */
+export type RemixSettingField =
+  | keyof import("./types.js").RemixGameplaySettings
+  | keyof import("./types.js").RemixStageSettings;
+
+const REMIX_GAMEPLAY_SETTING_VALUE_NAMES: Readonly<
+  Record<string, readonly string[]>
+> = {
+  hitstun: ["Normal", "Melee"],
+  hitlag: ["Normal", "Japanese", "Melee", "Ultimate", "None"],
+  di: ["Normal", "Japanese", "Ultimate"],
+  japaneseSounds: ["Default", "Always", "Never"],
+  japaneseStunSleep: ["Off", "On"],
+  momentumSlide: ["Off", "On"],
+  shieldStun: ["Default", "Japanese", "Melee", "Brawl", "Ultimate"],
+  zCancel: ["Default", "Disabled", "Melee (7 frames)", "Auto", "Glide Mode"],
+  punishFailedZCancel: [
+    "Off",
+    "7% Damage",
+    "Lava Floor",
+    "Shield-Break",
+    "Instant K.O.",
+    "Force Taunt",
+    "Bury",
+    "Laugh Track",
+    "Egg",
+    "Sleep",
+    "Trip",
+    "Random",
+  ],
+  improvedAI: ["Off", "On"],
+  tripping: ["Off", "Low", "High", '"Brawl"'],
+  rage: ["Off", "Ultimate", "Smash 4", "Berserk", "Fatigue"],
+  footstoolJumping: ["Off", "On"],
+  airDodging: ["Off", "Melee", "Ultimate", "Air Dash"],
+  jabLocking: ["Off", "On"],
+  edgeCJumping: ["Off", "On"],
+  perfectShielding: ["Off", "On"],
+  parrying: ["Off", "On"],
+  spotDodging: ["Off", "On"],
+  fastFallAerials: ["Off", "On"],
+  ledgeTrumping: ["Off", "On"],
+  wallTeching: ["Off", "On"],
+  chargeSmashes: ["Off", "On", "Unlimited Charge"],
+  itemContainers: ["Default", "Off", "Never Explode", "Always Explode"],
+  gameSpeed: [
+    "1/1",
+    "1.2x",
+    "1.3x",
+    "1.5x",
+    "1.75x",
+    "2.0x",
+    "3.0x",
+    "1/8",
+    "1/4",
+    "1/3",
+    "1/2",
+    "2/3",
+    "3/4",
+  ],
+  specialZoom: ["Off", "Match End", "Any KO"],
+  blastzoneWarp: ["Off", "Left/Right", "Top/Bottom", "All"],
+  singleButtonMode: [
+    "Off",
+    '"A"',
+    '"B"',
+    '"R"',
+    '"A"+"C"',
+    '"B"+"C"',
+    '"R"+"C"',
+  ],
+  allItemsRDropAerial: ["Off", "On"],
+  moveStaling: [
+    "Default",
+    "Disabled",
+    "Lenient",
+    "Strict",
+    "Wait For It",
+    "Reverse",
+    "Cheap Shot",
+  ],
+  stopwatchItem: [
+    "Default",
+    "Slow Always",
+    "Fast Always",
+    "Backfire Always",
+    "Backfire Never",
+  ],
+};
+
+const REMIX_STAGE_SETTING_VALUE_NAMES: Readonly<
+  Record<string, readonly string[]>
+> = {
+  stageSelectLayout: ["Normal", "Tournament"],
+  hazardMode: ["Normal", "Hazards Off", "Movement Off", "All Off"],
+  whispyMode: ["Normal", "Japanese", "Super", "Hyper"],
+  saffronPokemonRate: ["Normal", "Super", "Hyper", "Quick Attack"],
+  pokemonAnnouncer: ["Stadium", "All Stages", "Off"],
+  dragonKingHUD: ["Dragon King", "All Stages", "Off"],
+  cameraMode: ["Normal", "Bonus", "Fixed", "Scene"],
+  yoshiIslandCloudAnims: ["Off", "On"],
+};
+
+const REMIX_SETTING_VALUE_NAMES: Readonly<Record<string, readonly string[]>> = {
+  ...REMIX_GAMEPLAY_SETTING_VALUE_NAMES,
+  ...REMIX_STAGE_SETTING_VALUE_NAMES,
+};
+
+/**
+ * Human-readable name for one Remix Gameplay/Stage Setting's raw value,
+ * e.g. `getRemixSettingValueName("hitlag", 2)` → `"Melee"`. Falls back to
+ * a bare-number placeholder for an out-of-range value or an unrecognized
+ * field name - never throws. See `docs/RMGR_SPEC.md` §5.1.1/§5.1.2.
+ */
+export function getRemixSettingValueName(
+  field: RemixSettingField | string,
+  value: number,
+): string {
+  const names = REMIX_SETTING_VALUE_NAMES[field];
+  return names?.[value] ?? `${field} ${value}`;
+}

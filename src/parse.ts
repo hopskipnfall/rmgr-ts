@@ -4,6 +4,7 @@ import {
   EventCode,
   FORMAT_VERSION,
   ITEM_UPDATE_SIZE_WITHOUT_SCALE,
+  MATCH_SETTINGS_SIZE_WITHOUT_REMIX_SETTINGS,
   STATE_FRAME_SIZE_SCHEMA_1,
   GAME_FAMILY_WIDTH,
   GOOD_NAME_WIDTH,
@@ -24,6 +25,8 @@ import type {
   MatchSettings,
   MatchStart,
   PortIndex,
+  RemixGameplaySettings,
+  RemixStageSettings,
   Replay,
   ReplayHeader,
   StateFrame,
@@ -96,7 +99,16 @@ function parseMatchStart(reader: BinaryReader): MatchStart {
   return { playerNames, slotType };
 }
 
-function parseMatchSettings(reader: BinaryReader): MatchSettings {
+/**
+ * `declaredSize` is this file's own EventPayloads size for MatchSettings:
+ * the trailing rngSeed/gameplaySettings/stageSettings (recorder schema 3+)
+ * are only read when it includes them, so schema-1/2 files (32 bytes)
+ * parse exactly as before, with none of them.
+ */
+function parseMatchSettings(
+  reader: BinaryReader,
+  declaredSize: number,
+): MatchSettings {
   const stageId = reader.readU8();
   const gameType = reader.readU8();
   const stockCountSetting = reader.readU8();
@@ -112,7 +124,7 @@ function parseMatchSettings(reader: BinaryReader): MatchSettings {
   const portHandicap = readPortTuple(() => reader.readU8());
   const portCpuLevel = readPortTuple(() => reader.readU8());
 
-  return {
+  const base: MatchSettings = {
     stageId,
     gameType,
     stockCountSetting,
@@ -128,6 +140,54 @@ function parseMatchSettings(reader: BinaryReader): MatchSettings {
     portHandicap,
     portCpuLevel,
   };
+  if (declaredSize <= MATCH_SETTINGS_SIZE_WITHOUT_REMIX_SETTINGS) return base;
+
+  const rngSeed = reader.readI32();
+  const gameplaySettings: RemixGameplaySettings = {
+    hitstun: reader.readU8(),
+    hitlag: reader.readU8(),
+    di: reader.readU8(),
+    japaneseSounds: reader.readU8(),
+    japaneseStunSleep: reader.readU8(),
+    momentumSlide: reader.readU8(),
+    shieldStun: reader.readU8(),
+    zCancel: reader.readU8(),
+    punishFailedZCancel: reader.readU8(),
+    improvedAI: reader.readU8(),
+    tripping: reader.readU8(),
+    rage: reader.readU8(),
+    footstoolJumping: reader.readU8(),
+    airDodging: reader.readU8(),
+    jabLocking: reader.readU8(),
+    edgeCJumping: reader.readU8(),
+    perfectShielding: reader.readU8(),
+    parrying: reader.readU8(),
+    spotDodging: reader.readU8(),
+    fastFallAerials: reader.readU8(),
+    ledgeTrumping: reader.readU8(),
+    wallTeching: reader.readU8(),
+    chargeSmashes: reader.readU8(),
+    itemContainers: reader.readU8(),
+    gameSpeed: reader.readU8(),
+    specialZoom: reader.readU8(),
+    blastzoneWarp: reader.readU8(),
+    singleButtonMode: reader.readU8(),
+    allItemsRDropAerial: reader.readU8(),
+    moveStaling: reader.readU8(),
+    stopwatchItem: reader.readU8(),
+  };
+  const stageSettings: RemixStageSettings = {
+    stageSelectLayout: reader.readU8(),
+    hazardMode: reader.readU8(),
+    whispyMode: reader.readU8(),
+    saffronPokemonRate: reader.readU8(),
+    pokemonAnnouncer: reader.readU8(),
+    dragonKingHUD: reader.readU8(),
+    cameraMode: reader.readU8(),
+    yoshiIslandCloudAnims: reader.readU8(),
+  };
+
+  return { ...base, rngSeed, gameplaySettings, stageSettings };
 }
 
 function parseInputFrame(reader: BinaryReader): InputFrame {
@@ -389,17 +449,17 @@ export async function parseReplay(data: Uint8Array): Promise<Replay> {
           parseMatchStart,
         );
         break;
-      case EventCode.MatchSettings:
-        matchSettings = readKnownPayload(
-          reader,
-          requireDeclaredSize(
-            declaredSizes,
-            EventCode.MatchSettings,
-            "MatchSettings",
-          ),
-          parseMatchSettings,
+      case EventCode.MatchSettings: {
+        const matchSettingsSize = requireDeclaredSize(
+          declaredSizes,
+          EventCode.MatchSettings,
+          "MatchSettings",
+        );
+        matchSettings = readKnownPayload(reader, matchSettingsSize, (r) =>
+          parseMatchSettings(r, matchSettingsSize),
         );
         break;
+      }
       case EventCode.InputFrame: {
         const input = readKnownPayload(
           reader,
