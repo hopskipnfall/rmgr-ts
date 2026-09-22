@@ -856,9 +856,385 @@ export const ACTION_STATE_NAMES_JA: Readonly<Record<number, string>> = {
   0x0db: "着地隙",
 };
 
+// ---------------------------------------------------------------------------
+// Character-specific action states (docs/RMGR_SPEC.md section 8.3.1) -
+// ActionStateId >= 0x0DC. There is no cross-character ID sharing at the
+// engine level: every character's status enum independently restarts at
+// 0x0DC in its own source file, so the same numeric value means something
+// different (or nothing) per character. The one exception is Luigi, whose
+// table is byte-for-byte identical to Mario's and points at the literal
+// same functions - confirmed against the decompilation, not just
+// coincidentally same-numbered - so the two share MARIO_LUIGI_ACTION_STATE_NAMES
+// below. Every other table here is independently verified.
+//
+// A few states below aren't actually special moves despite sharing this
+// numeric block - Attack13 (Mario/Luigi/Falcon/Link/Ness) and
+// Attack100Start/Loop/End (Fox/Kirby/Jigglypuff) are jab-combo
+// continuation states from the original engine's per-character table
+// layout. Flagged inline rather than assumed.
+//
+// Scoped to the original 12 characters only (see getCharacterFamily()) -
+// not extended to any Remix-added unique character that merely looks like
+// a reskin (Dr. Mario, Dr. Luigi, Dark Samus, Giant DK, etc.), since those
+// aren't confirmed to share an original character's code.
+//
+// English only - like ItemUpdate's kind (getItemKindName()), these come
+// straight from the decompilation's own symbol names, and no Japanese
+// translation is documented for them.
+
+const MARIO_LUIGI_ACTION_STATE_NAMES: Readonly<Record<number, string>> = {
+  0x0dc: "Attack13", // jab-combo continuation, not a special
+  0x0dd: "AppearR",
+  0x0de: "AppearL",
+  0x0df: "SpecialN",
+  0x0e0: "SpecialAirN",
+  0x0e1: "SpecialHi",
+  0x0e2: "SpecialAirHi",
+  0x0e3: "SpecialLw",
+  0x0e4: "SpecialAirLw",
+};
+
+const FOX_ACTION_STATE_NAMES: Readonly<Record<number, string>> = {
+  0x0dc: "Attack100Start", // jab-combo continuation, not a special
+  0x0dd: "Attack100Loop", // jab-combo continuation, not a special
+  0x0de: "Attack100End", // jab-combo continuation, not a special
+  0x0df: "AppearR",
+  0x0e0: "AppearL",
+  0x0e1: "SpecialN",
+  0x0e2: "SpecialAirN",
+  0x0e3: "SpecialHiStart",
+  0x0e4: "SpecialAirHiStart",
+  0x0e5: "SpecialHiHold",
+  0x0e6: "SpecialAirHiHold",
+  0x0e7: "SpecialHi",
+  0x0e8: "SpecialAirHi",
+  0x0e9: "SpecialHiEnd",
+  0x0ea: "SpecialAirHiEnd",
+  0x0eb: "SpecialAirHiBound",
+  0x0ec: "SpecialLwStart",
+  0x0ed: "SpecialLwHit",
+  0x0ee: "SpecialLwEnd",
+  0x0ef: "SpecialLwLoop",
+  0x0f0: "SpecialLwTurn",
+  0x0f1: "SpecialAirLwStart",
+  0x0f2: "SpecialAirLwHit",
+  0x0f3: "SpecialAirLwEnd",
+  0x0f4: "SpecialAirLwLoop",
+  0x0f5: "SpecialAirLwTurn",
+};
+
+const DONKEY_KONG_ACTION_STATE_NAMES: Readonly<Record<number, string>> = {
+  0x0dc: "AppearR",
+  0x0dd: "AppearL",
+  0x0de: "SpecialNStart",
+  0x0df: "SpecialAirNStart",
+  0x0e0: "SpecialNLoop",
+  0x0e1: "SpecialAirNLoop",
+  0x0e2: "SpecialNEnd",
+  0x0e3: "SpecialAirNEnd",
+  0x0e4: "SpecialNFull",
+  0x0e5: "SpecialAirNFull",
+  0x0e6: "SpecialHi",
+  0x0e7: "SpecialAirHi",
+  0x0e8: "SpecialLwStart",
+  0x0e9: "SpecialLwLoop",
+  0x0ea: "SpecialLwEnd",
+  0x0eb: "ThrowFWait",
+  0x0ec: "ThrowFWalkSlow",
+  0x0ed: "ThrowFWalkMiddle",
+  0x0ee: "ThrowFWalkFast",
+  0x0ef: "ThrowFTurn",
+  0x0f0: "ThrowFKneeBend",
+  0x0f1: "ThrowFFall",
+  0x0f2: "ThrowFLanding",
+  0x0f3: "ThrowFDamage", // aka ThrowFEnd
+  0x0f4: "ThrowFF",
+  0x0f5: "ThrowAirFF",
+  0x0f6: "HeavyThrowF",
+  0x0f7: "HeavyThrowB",
+  0x0f8: "HeavyThrowF4",
+  0x0f9: "HeavyThrowB4",
+};
+
+const SAMUS_ACTION_STATE_NAMES: Readonly<Record<number, string>> = {
+  0x0dc: "AppearR",
+  0x0dd: "AppearL",
+  0x0de: "SpecialNStart",
+  0x0df: "SpecialNLoop",
+  0x0e0: "SpecialNEnd",
+  0x0e1: "SpecialAirNStart",
+  0x0e2: "SpecialAirNEnd",
+  0x0e3: "SpecialHi",
+  0x0e4: "SpecialAirHi",
+  0x0e5: "SpecialLw",
+  0x0e6: "SpecialAirLw",
+};
+
+const LINK_ACTION_STATE_NAMES: Readonly<Record<number, string>> = {
+  0x0dc: "Attack13", // jab-combo continuation, not a special
+  0x0dd: "Attack100Start",
+  0x0de: "Attack100Loop",
+  0x0df: "Attack100End",
+  0x0e0: "AppearR",
+  0x0e1: "AppearL",
+  0x0e2: "SpecialHi",
+  0x0e3: "SpecialHiEnd",
+  0x0e4: "SpecialAirHi",
+  0x0e5: "SpecialN",
+  0x0e6: "SpecialNGet",
+  0x0e7: "SpecialNEmpty",
+  0x0e8: "SpecialAirN",
+  0x0e9: "SpecialAirNReturn",
+  0x0ea: "SpecialAirNEmpty",
+  0x0eb: "SpecialLw",
+  0x0ec: "SpecialAirLw",
+};
+
+// SpecialHi/SpecialAirHi here are the plain double-jump slot - Yoshi has
+// no real up-B.
+const YOSHI_ACTION_STATE_NAMES: Readonly<Record<number, string>> = {
+  0x0dc: "AppearR",
+  0x0dd: "AppearL",
+  0x0de: "SpecialHi",
+  0x0df: "SpecialAirHi",
+  0x0e0: "SpecialLwStart",
+  0x0e1: "SpecialLwLanding",
+  0x0e2: "SpecialAirLwStart",
+  0x0e3: "SpecialAirLwLoop",
+  0x0e4: "SpecialN",
+  0x0e5: "SpecialNCatch",
+  0x0e6: "SpecialNRelease",
+  0x0e7: "SpecialAirN",
+  0x0e8: "SpecialAirNCatch",
+  0x0e9: "SpecialAirNRelease",
+};
+
+const CAPTAIN_FALCON_ACTION_STATE_NAMES: Readonly<Record<number, string>> = {
+  0x0dc: "Attack13", // jab-combo continuation, not a special
+  0x0dd: "Attack100Start",
+  0x0de: "Attack100Loop",
+  0x0df: "Attack100End",
+  0x0e0: "AppearRStart",
+  0x0e1: "AppearLStart",
+  0x0e2: "AppearREnd",
+  0x0e3: "AppearLEnd",
+  0x0e4: "SpecialN",
+  0x0e5: "SpecialAirN",
+  0x0e6: "SpecialLw",
+  0x0e7: "SpecialLwAir",
+  0x0e8: "SpecialLwLanding",
+  0x0e9: "SpecialAirLw",
+  0x0ea: "SpecialLwBound",
+  0x0eb: "SpecialHi",
+  0x0ec: "SpecialHiCatch",
+  0x0ed: "SpecialHiThrow",
+  0x0ee: "SpecialAirHi",
+};
+
+const PIKACHU_ACTION_STATE_NAMES: Readonly<Record<number, string>> = {
+  0x0dc: "AppearR",
+  0x0dd: "AppearL",
+  0x0de: "SpecialN",
+  0x0df: "SpecialAirN",
+  0x0e0: "SpecialLwStart",
+  0x0e1: "SpecialLwLoop",
+  0x0e2: "SpecialLwHit",
+  0x0e3: "SpecialLwEnd",
+  0x0e4: "SpecialAirLwStart",
+  0x0e5: "SpecialAirLwLoop",
+  0x0e6: "SpecialAirLwHit",
+  0x0e7: "SpecialAirLwEnd",
+  0x0e8: "SpecialHiStart",
+  0x0e9: "SpecialHi",
+  0x0ea: "SpecialHiEnd",
+  0x0eb: "SpecialAirHiStart",
+  0x0ec: "SpecialAirHi",
+  0x0ed: "SpecialAirHiEnd",
+};
+
+const JIGGLYPUFF_ACTION_STATE_NAMES: Readonly<Record<number, string>> = {
+  0x0dc: "Attack100Start", // unused, per the decomp's own comment
+  0x0dd: "Attack100Loop", // unused
+  0x0de: "Attack100End", // unused
+  0x0df: "JumpAerialF1",
+  0x0e0: "JumpAerialF2",
+  0x0e1: "JumpAerialF3",
+  0x0e2: "JumpAerialF4",
+  0x0e3: "JumpAerialF5",
+  0x0e4: "AppearR",
+  0x0e5: "AppearL",
+  0x0e6: "SpecialN",
+  0x0e7: "SpecialAirN",
+  0x0e8: "SpecialHi",
+  0x0e9: "SpecialAirHi",
+  0x0ea: "SpecialLw",
+  0x0eb: "SpecialAirLw",
+};
+
+const NESS_ACTION_STATE_NAMES: Readonly<Record<number, string>> = {
+  0x0dc: "Attack13", // jab-combo continuation, not a special
+  0x0dd: "AppearRStart",
+  0x0de: "AppearLStart",
+  0x0df: "AppearWait",
+  0x0e0: "AppearREnd",
+  0x0e1: "AppearLEnd",
+  0x0e2: "SpecialN",
+  0x0e3: "SpecialAirN",
+  0x0e4: "SpecialHiStart",
+  0x0e5: "SpecialHiHold",
+  0x0e6: "SpecialHiEnd",
+  0x0e7: "SpecialHiJibaku",
+  0x0e8: "SpecialAirHiStart",
+  0x0e9: "SpecialAirHiHold",
+  0x0ea: "SpecialAirHiEnd",
+  0x0eb: "SpecialAirHiBound",
+  0x0ec: "SpecialAirHiJibaku",
+  0x0ed: "SpecialLwStart",
+  0x0ee: "SpecialLwHold",
+  0x0ef: "SpecialLwHit",
+  0x0f0: "SpecialLwEnd",
+  0x0f1: "SpecialAirLwStart",
+  0x0f2: "SpecialAirLwHold",
+  0x0f3: "SpecialAirLwHit",
+  0x0f4: "SpecialAirLwEnd",
+};
+
+// By far the largest, since it includes a full duplicate move-set slot for
+// every character whose neutral-B Kirby can copy. "Purin" is Jigglypuff's
+// Japanese name, used verbatim in the decompilation's own symbol names.
+// There is no CopyKirbySpecialN and no Copy-DK-SpecialHi/Lw slots, since
+// only neutral-B is copyable - matches the decompilation's own naming
+// exactly, nothing inferred.
+const KIRBY_ACTION_STATE_NAMES: Readonly<Record<number, string>> = {
+  0x0dc: "Attack100Start", // jab-combo continuation, not a special
+  0x0dd: "Attack100Loop", // jab-combo continuation, not a special
+  0x0de: "Attack100End", // jab-combo continuation, not a special
+  0x0df: "JumpAerialF1",
+  0x0e0: "JumpAerialF2",
+  0x0e1: "JumpAerialF3",
+  0x0e2: "JumpAerialF4",
+  0x0e3: "JumpAerialF5",
+  0x0e4: "ThrowF",
+  0x0e5: "ThrowFFall",
+  0x0e6: "ThrowFLanding",
+  0x0e7: "CopyMarioSpecialN",
+  0x0e8: "CopyMarioSpecialAirN",
+  0x0e9: "CopyLuigiSpecialN",
+  0x0ea: "CopyLuigiSpecialAirN",
+  0x0eb: "CopyFoxSpecialN",
+  0x0ec: "CopyFoxSpecialAirN",
+  0x0ed: "CopySamusSpecialNStart",
+  0x0ee: "CopySamusSpecialNLoop",
+  0x0ef: "CopySamusSpecialNEnd",
+  0x0f0: "CopySamusSpecialAirNStart",
+  0x0f1: "CopySamusSpecialAirNEnd",
+  0x0f2: "CopyDonkeySpecialNStart",
+  0x0f3: "CopyDonkeySpecialAirNStart",
+  0x0f4: "CopyDonkeySpecialNLoop",
+  0x0f5: "CopyDonkeySpecialAirNLoop",
+  0x0f6: "CopyDonkeySpecialNEnd",
+  0x0f7: "CopyDonkeySpecialAirNEnd",
+  0x0f8: "CopyDonkeySpecialNFull",
+  0x0f9: "CopyDonkeySpecialAirNFull",
+  0x0fa: "AppearR",
+  0x0fb: "AppearL",
+  0x0fc: "CopyPikachuSpecialN",
+  0x0fd: "CopyPikachuSpecialAirN",
+  0x0fe: "CopyNessSpecialN",
+  0x0ff: "CopyNessSpecialAirN",
+  0x100: "SpecialHi",
+  0x101: "SpecialHiLanding",
+  0x102: "SpecialAirHi",
+  0x103: "SpecialAirHiFall",
+  0x104: "SpecialLwStart",
+  0x105: "SpecialLwUnk",
+  0x106: "SpecialLwHold",
+  0x107: "SpecialLwEnd",
+  0x108: "SpecialAirLwStart",
+  0x109: "SpecialAirLwHold",
+  0x10a: "SpecialAirLwLanding",
+  0x10b: "SpecialAirLwFall",
+  0x10c: "SpecialAirLwEnd",
+  0x10d: "SpecialNStart",
+  0x10e: "SpecialNLoop",
+  0x10f: "SpecialNEnd",
+  0x110: "SpecialNCatch",
+  0x111: "SpecialNEat",
+  0x112: "SpecialNThrow",
+  0x113: "SpecialNWait",
+  0x114: "SpecialNTurn",
+  0x115: "SpecialNCopy",
+  0x116: "SpecialAirNStart",
+  0x117: "SpecialAirNLoop",
+  0x118: "SpecialAirNEnd",
+  0x119: "SpecialAirNCatch",
+  0x11a: "SpecialAirNEat",
+  0x11b: "SpecialAirNThrow",
+  0x11c: "SpecialAirNWait",
+  0x11d: "SpecialAirNTurn",
+  0x11e: "SpecialAirNCopy",
+  0x11f: "CopyLinkSpecialN",
+  0x120: "CopyLinkSpecialNGet",
+  0x121: "CopyLinkSpecialNEmpty",
+  0x122: "CopyLinkSpecialAirN",
+  0x123: "CopyLinkSpecialAirNReturn",
+  0x124: "CopyLinkSpecialAirNEmpty",
+  0x125: "CopyPurinSpecialN",
+  0x126: "CopyPurinSpecialAirN",
+  0x127: "CopyCaptainSpecialN",
+  0x128: "CopyCaptainSpecialAirN",
+  0x129: "CopyYoshiSpecialN",
+  0x12a: "CopyYoshiSpecialNCatch",
+  0x12b: "CopyYoshiSpecialNRelease",
+  0x12c: "CopyYoshiSpecialAirN",
+  0x12d: "CopyYoshiSpecialAirNCatch",
+  0x12e: "CopyYoshiSpecialAirNRelease",
+};
+
+/** The original 12 characters' movesets - see getCharacterFamily(). */
+export type CharacterFamily =
+  | "mario" // shared with Luigi - see MARIO_LUIGI_ACTION_STATE_NAMES
+  | "luigi"
+  | "fox"
+  | "donkeyKong"
+  | "samus"
+  | "link"
+  | "yoshi"
+  | "captainFalcon"
+  | "kirby"
+  | "pikachu"
+  | "jigglypuff"
+  | "ness";
+
+const CHARACTER_ACTION_STATE_NAMES: Readonly<
+  Record<CharacterFamily, Readonly<Record<number, string>>>
+> = {
+  mario: MARIO_LUIGI_ACTION_STATE_NAMES,
+  luigi: MARIO_LUIGI_ACTION_STATE_NAMES,
+  fox: FOX_ACTION_STATE_NAMES,
+  donkeyKong: DONKEY_KONG_ACTION_STATE_NAMES,
+  samus: SAMUS_ACTION_STATE_NAMES,
+  link: LINK_ACTION_STATE_NAMES,
+  yoshi: YOSHI_ACTION_STATE_NAMES,
+  captainFalcon: CAPTAIN_FALCON_ACTION_STATE_NAMES,
+  kirby: KIRBY_ACTION_STATE_NAMES,
+  pikachu: PIKACHU_ACTION_STATE_NAMES,
+  jigglypuff: JIGGLYPUFF_ACTION_STATE_NAMES,
+  ness: NESS_ACTION_STATE_NAMES,
+};
+
 export interface LookupOptions {
   readonly goodName?: string | undefined;
   readonly lang?: Language | undefined;
+  /**
+   * Which character's moveset to resolve a character-specific action state
+   * (`>= 0x0DC`) against - see `CharacterFamily`/`getCharacterFamily()`.
+   * Ignored for `id < 0x0DC` (the shared table). Omit (or pass an ID that
+   * doesn't map to one of the original 12) to get the generic
+   * `Special 0x...` placeholder for that range, same as before this option
+   * existed.
+   */
+  readonly characterId?: number | undefined;
 }
 
 export interface GameDefinitions {
@@ -877,12 +1253,21 @@ export interface GameDefinitions {
   };
   getCharacterName(id: number, lang?: Language): string;
   getStageName(id: number, lang?: Language): string;
-  getActionStateName(id: number, lang?: Language): string;
+  // characterId resolves a character-specific action state (>= 0x0DC) -
+  // see LookupOptions.characterId's doc comment.
+  getActionStateName(id: number, lang?: Language, characterId?: number): string;
   isJigglypuffCharacter(id: number): boolean;
   isNessCharacter(id: number): boolean;
   isYoshiCharacter(id: number): boolean;
   isFoxCharacter(id: number): boolean;
   isMarioCharacter(id: number): boolean;
+  isLuigiCharacter(id: number): boolean;
+  isDonkeyKongCharacter(id: number): boolean;
+  isSamusCharacter(id: number): boolean;
+  isLinkCharacter(id: number): boolean;
+  isCaptainFalconCharacter(id: number): boolean;
+  isKirbyCharacter(id: number): boolean;
+  isPikachuCharacter(id: number): boolean;
   isShieldState(id: number): boolean;
   isShieldStunState(id: number): boolean;
   isShieldBreakState(id: number): boolean;
@@ -896,15 +1281,131 @@ export interface GameDefinitions {
 const FTILT_RANGE: [number, number] = [0x0c1, 0x0c5];
 const FSMASH_RANGE: [number, number] = [0x0ca, 0x0ce];
 
+/**
+ * Maps any character ID to one of the original 12 movesets, or `null` if
+ * `id` isn't confidently one of them - see `CharacterFamily`'s own doc
+ * comment for exactly what "confidently" excludes (Remix-added unique
+ * characters that merely look like a reskin, e.g. Dr. Mario/Dr. Luigi/Dark
+ * Samus/Giant DK). Polygon/JP/EU-region variants of an original 12
+ * character map to that character's family, following the same
+ * already-established convention as `isMarioCharacter()` etc.
+ */
+function getCharacterFamily(id: number): CharacterFamily | null {
+  if (isMarioCharacterId(id)) return "mario";
+  if (isLuigiCharacterId(id)) return "luigi";
+  if (isFoxCharacterId(id)) return "fox";
+  if (isDonkeyKongCharacterId(id)) return "donkeyKong";
+  if (isSamusCharacterId(id)) return "samus";
+  if (isLinkCharacterId(id)) return "link";
+  if (isYoshiCharacterId(id)) return "yoshi";
+  if (isCaptainFalconCharacterId(id)) return "captainFalcon";
+  if (isKirbyCharacterId(id)) return "kirby";
+  if (isPikachuCharacterId(id)) return "pikachu";
+  if (isJigglypuffCharacterId(id)) return "jigglypuff";
+  if (isNessCharacterId(id)) return "ness";
+  return null;
+}
+
+function isMarioCharacterId(id: number): boolean {
+  return (
+    id === CharacterId.Mario ||
+    id === CharacterId.PolygonMario ||
+    id === CharacterId.MarioJP
+  );
+}
+function isLuigiCharacterId(id: number): boolean {
+  return (
+    id === CharacterId.Luigi ||
+    id === CharacterId.PolygonLuigi ||
+    id === CharacterId.LuigiJP
+  );
+}
+function isFoxCharacterId(id: number): boolean {
+  return (
+    id === CharacterId.Fox ||
+    id === CharacterId.PolygonFox ||
+    id === CharacterId.FoxJP
+  );
+}
+function isDonkeyKongCharacterId(id: number): boolean {
+  return (
+    id === CharacterId.DonkeyKong ||
+    id === CharacterId.PolygonDK ||
+    id === CharacterId.DKJP
+  );
+}
+function isSamusCharacterId(id: number): boolean {
+  return (
+    id === CharacterId.Samus ||
+    id === CharacterId.PolygonSamus ||
+    id === CharacterId.SamusJP ||
+    id === CharacterId.SamusEU
+  );
+}
+function isLinkCharacterId(id: number): boolean {
+  return (
+    id === CharacterId.Link ||
+    id === CharacterId.PolygonLink ||
+    id === CharacterId.LinkJP ||
+    id === CharacterId.LinkEU
+  );
+}
+function isYoshiCharacterId(id: number): boolean {
+  return (
+    id === CharacterId.Yoshi ||
+    id === CharacterId.PolygonYoshi ||
+    id === CharacterId.YoshiJP
+  );
+}
+function isCaptainFalconCharacterId(id: number): boolean {
+  return (
+    id === CharacterId.CaptainFalcon ||
+    id === CharacterId.PolygonFalcon ||
+    id === CharacterId.FalconJP
+  );
+}
+function isKirbyCharacterId(id: number): boolean {
+  return (
+    id === CharacterId.Kirby ||
+    id === CharacterId.PolygonKirby ||
+    id === CharacterId.KirbyJP
+  );
+}
+function isPikachuCharacterId(id: number): boolean {
+  return (
+    id === CharacterId.Pikachu ||
+    id === CharacterId.PolygonPikachu ||
+    id === CharacterId.PikachuJP ||
+    id === CharacterId.PikachuEU
+  );
+}
+function isJigglypuffCharacterId(id: number): boolean {
+  return (
+    id === CharacterId.Jigglypuff ||
+    id === CharacterId.PolygonJigglypuff ||
+    id === CharacterId.JigglypuffJP ||
+    id === CharacterId.JigglypuffEU
+  );
+}
+function isNessCharacterId(id: number): boolean {
+  return (
+    id === CharacterId.Ness ||
+    id === CharacterId.PolygonNess ||
+    id === CharacterId.NessJP
+  );
+}
+
 function resolveLangAndGoodName(langOrOptions?: Language | LookupOptions): {
   lang: Language;
   goodName?: string | undefined;
+  characterId?: number | undefined;
 } {
   if (!langOrOptions) return { lang: "en" };
   if (typeof langOrOptions === "string") return { lang: langOrOptions };
   return {
     lang: langOrOptions.lang ?? "en",
     goodName: langOrOptions.goodName,
+    characterId: langOrOptions.characterId,
   };
 }
 
@@ -948,7 +1449,24 @@ class StandardGameDefinitions implements GameDefinitions {
     );
   }
 
-  getActionStateName(id: number, lang: Language = "en"): string {
+  getActionStateName(
+    id: number,
+    lang: Language = "en",
+    characterId?: number,
+  ): string {
+    // Character-specific range (docs/RMGR_SPEC.md section 8.3.1) - only
+    // resolved when a characterId maps to one of the original 12; anyone
+    // else (including no characterId at all) falls through to the generic
+    // placeholder below, same as before this parameter existed. English
+    // only - see CHARACTER_ACTION_STATE_NAMES's own doc comment for why.
+    if (id >= 0x0dc && characterId !== undefined) {
+      const family = getCharacterFamily(characterId);
+      if (family) {
+        const known = CHARACTER_ACTION_STATE_NAMES[family][id];
+        if (known) return known;
+      }
+    }
+
     const table =
       lang === "ja" ? this.actionStateNames.ja : this.actionStateNames.en;
     const known = table[id];
@@ -970,44 +1488,51 @@ class StandardGameDefinitions implements GameDefinitions {
   }
 
   isJigglypuffCharacter(id: number): boolean {
-    return (
-      id === CharacterId.Jigglypuff ||
-      id === CharacterId.PolygonJigglypuff ||
-      id === CharacterId.JigglypuffJP ||
-      id === CharacterId.JigglypuffEU
-    );
+    return isJigglypuffCharacterId(id);
   }
 
   isNessCharacter(id: number): boolean {
-    return (
-      id === CharacterId.Ness ||
-      id === CharacterId.PolygonNess ||
-      id === CharacterId.NessJP
-    );
+    return isNessCharacterId(id);
   }
 
   isYoshiCharacter(id: number): boolean {
-    return (
-      id === CharacterId.Yoshi ||
-      id === CharacterId.PolygonYoshi ||
-      id === CharacterId.YoshiJP
-    );
+    return isYoshiCharacterId(id);
   }
 
   isFoxCharacter(id: number): boolean {
-    return (
-      id === CharacterId.Fox ||
-      id === CharacterId.PolygonFox ||
-      id === CharacterId.FoxJP
-    );
+    return isFoxCharacterId(id);
   }
 
   isMarioCharacter(id: number): boolean {
-    return (
-      id === CharacterId.Mario ||
-      id === CharacterId.PolygonMario ||
-      id === CharacterId.MarioJP
-    );
+    return isMarioCharacterId(id);
+  }
+
+  isLuigiCharacter(id: number): boolean {
+    return isLuigiCharacterId(id);
+  }
+
+  isDonkeyKongCharacter(id: number): boolean {
+    return isDonkeyKongCharacterId(id);
+  }
+
+  isSamusCharacter(id: number): boolean {
+    return isSamusCharacterId(id);
+  }
+
+  isLinkCharacter(id: number): boolean {
+    return isLinkCharacterId(id);
+  }
+
+  isCaptainFalconCharacter(id: number): boolean {
+    return isCaptainFalconCharacterId(id);
+  }
+
+  isKirbyCharacter(id: number): boolean {
+    return isKirbyCharacterId(id);
+  }
+
+  isPikachuCharacter(id: number): boolean {
+    return isPikachuCharacterId(id);
   }
 
   isShieldState(id: number): boolean {
@@ -1093,8 +1618,8 @@ export function getActionStateName(
   id: number,
   langOrOptions?: Language | LookupOptions,
 ): string {
-  const { lang, goodName } = resolveLangAndGoodName(langOrOptions);
-  return getGameDefinitions(goodName).getActionStateName(id, lang);
+  const { lang, goodName, characterId } = resolveLangAndGoodName(langOrOptions);
+  return getGameDefinitions(goodName).getActionStateName(id, lang, characterId);
 }
 
 export function isJigglypuffCharacter(id: number, goodName?: string): boolean {
@@ -1115,6 +1640,37 @@ export function isFoxCharacter(id: number, goodName?: string): boolean {
 
 export function isMarioCharacter(id: number, goodName?: string): boolean {
   return getGameDefinitions(goodName).isMarioCharacter(id);
+}
+
+export function isLuigiCharacter(id: number, goodName?: string): boolean {
+  return getGameDefinitions(goodName).isLuigiCharacter(id);
+}
+
+export function isDonkeyKongCharacter(id: number, goodName?: string): boolean {
+  return getGameDefinitions(goodName).isDonkeyKongCharacter(id);
+}
+
+export function isSamusCharacter(id: number, goodName?: string): boolean {
+  return getGameDefinitions(goodName).isSamusCharacter(id);
+}
+
+export function isLinkCharacter(id: number, goodName?: string): boolean {
+  return getGameDefinitions(goodName).isLinkCharacter(id);
+}
+
+export function isCaptainFalconCharacter(
+  id: number,
+  goodName?: string,
+): boolean {
+  return getGameDefinitions(goodName).isCaptainFalconCharacter(id);
+}
+
+export function isKirbyCharacter(id: number, goodName?: string): boolean {
+  return getGameDefinitions(goodName).isKirbyCharacter(id);
+}
+
+export function isPikachuCharacter(id: number, goodName?: string): boolean {
+  return getGameDefinitions(goodName).isPikachuCharacter(id);
 }
 
 export function isShieldState(id: number, goodName?: string): boolean {
