@@ -197,6 +197,110 @@ describe("Action state lookups", () => {
   });
 });
 
+describe("Character-specific action state lookups (>= 0x0DC)", () => {
+  it("resolves the shared table the same way with or without a characterId", () => {
+    expect(
+      getActionStateName(ActionStateId.Idle, {
+        characterId: CharacterId.Mario,
+      }),
+    ).toBe("Idle");
+  });
+
+  it("resolves each of the original 12's own >= 0x0DC states", () => {
+    expect(getActionStateName(0x0dc, { characterId: CharacterId.Mario })).toBe(
+      "Attack13",
+    );
+    expect(getActionStateName(0x0df, { characterId: CharacterId.Mario })).toBe(
+      "SpecialN",
+    );
+    expect(getActionStateName(0x0e4, { characterId: CharacterId.Mario })).toBe(
+      "SpecialAirLw",
+    );
+
+    expect(getActionStateName(0x0e1, { characterId: CharacterId.Fox })).toBe(
+      "SpecialN",
+    );
+    expect(getActionStateName(0x0f5, { characterId: CharacterId.Fox })).toBe(
+      "SpecialAirLwTurn",
+    );
+
+    expect(
+      getActionStateName(0x0f9, { characterId: CharacterId.DonkeyKong }),
+    ).toBe("HeavyThrowB4");
+
+    expect(getActionStateName(0x0e6, { characterId: CharacterId.Samus })).toBe(
+      "SpecialAirLw",
+    );
+
+    expect(getActionStateName(0x0e5, { characterId: CharacterId.Link })).toBe(
+      "SpecialN",
+    );
+
+    expect(getActionStateName(0x0de, { characterId: CharacterId.Yoshi })).toBe(
+      "SpecialHi",
+    );
+
+    expect(
+      getActionStateName(0x0ee, { characterId: CharacterId.CaptainFalcon }),
+    ).toBe("SpecialAirHi");
+
+    expect(
+      getActionStateName(0x0e9, { characterId: CharacterId.Pikachu }),
+    ).toBe("SpecialHi");
+
+    expect(
+      getActionStateName(0x0eb, { characterId: CharacterId.Jigglypuff }),
+    ).toBe("SpecialAirLw");
+
+    expect(getActionStateName(0x0f4, { characterId: CharacterId.Ness })).toBe(
+      "SpecialAirLwEnd",
+    );
+
+    expect(getActionStateName(0x12e, { characterId: CharacterId.Kirby })).toBe(
+      "CopyYoshiSpecialAirNRelease",
+    );
+  });
+
+  it("treats Luigi as identical to Mario, byte-for-byte", () => {
+    expect(getActionStateName(0x0e1, { characterId: CharacterId.Luigi })).toBe(
+      "SpecialHi",
+    );
+    expect(getActionStateName(0x0e1, { characterId: CharacterId.Luigi })).toBe(
+      getActionStateName(0x0e1, { characterId: CharacterId.Mario }),
+    );
+  });
+
+  it("resolves same-moveset Polygon/JP/EU variant IDs to the same table", () => {
+    expect(
+      getActionStateName(0x0df, { characterId: CharacterId.MarioJP }),
+    ).toBe("SpecialN");
+    expect(
+      getActionStateName(0x0df, { characterId: CharacterId.PolygonMario }),
+    ).toBe("SpecialN");
+    expect(
+      getActionStateName(0x0e3, { characterId: CharacterId.SamusEU }),
+    ).toBe("SpecialHi");
+  });
+
+  it("flags jab-combo continuations sharing the block, not just special moves", () => {
+    // Explicitly called out as non-special in the spec/lookups doc comment.
+    expect(getActionStateName(0x0dc, { characterId: CharacterId.Ness })).toBe(
+      "Attack13",
+    );
+  });
+
+  it("falls back to the generic placeholder for a character with no table", () => {
+    // Bowser is a Remix-added unique character, not one of the original 12.
+    expect(getActionStateName(0x0dc, { characterId: CharacterId.Bowser })).toBe(
+      "Special 0xdc",
+    );
+  });
+
+  it("falls back to the generic placeholder when no characterId is given", () => {
+    expect(getActionStateName(0x0dc)).toBe("Special 0xdc");
+  });
+});
+
 describe("Remix Gameplay/Stage Setting lookups", () => {
   it("resolves gameplay and stage setting value names", () => {
     expect(getRemixSettingValueName("hitlag", 2)).toBe("Melee");
